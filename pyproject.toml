@@ -1,0 +1,65 @@
+[project]
+name = "dlm"
+version = "0.1.0"
+description = "Disruption-aware last-mile routing on Dublin's road network (UCD ACM40960)"
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [
+    { name = "Shlok Shetty" },
+    { name = "Rushikesh Mane" },
+]
+dependencies = [
+    "osmnx>=1.9",
+    "networkx>=3.2",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "typer>=0.12",
+    "pyyaml>=6.0",
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "matplotlib>=3.8",
+    "folium>=0.16",
+    "shapely>=2.0",
+    "geopy>=2.4",
+]
+
+[project.optional-dependencies]
+ui = [
+    "streamlit>=1.32",
+    "streamlit-folium>=0.20",
+]
+fleet = [
+    "ortools>=9.9",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+dlm = "dlm.cli:app"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP", "B"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

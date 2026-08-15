@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Env
+.env
+
+# Data caches (regenerable; see Makefile / docs/data.md)
+data/cache/*
+!data/cache/.gitkeep
+
+# Results (per-run outputs; regenerable via `make experiment`)
+results/*
+!results/README.md
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
