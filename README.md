@@ -71,7 +71,7 @@ docs/             architecture, modelling, data provenance, ADRs, one doc per st
 | 2 | Dynamic instances | ✅ |
 | 3 | Travel-time matrix | ✅ |
 | 4 | Baseline solver | ✅ |
-| 5 | Disruption engine | ⬜ |
+| 5 | Disruption engine | ✅ |
 | 6 | Experiment core (T1/T2/T3) | ⬜ |
 | 7 | Results harness | ⬜ |
 | 8 | Fleet & benchmark | ⬜ |

@@ -1,0 +1,22 @@
+schema_version: 1
+name: luas_works_dawson_street
+description: >
+  Track/utility works on Dawson Street (part of the Luas Cross City
+  corridor, between St Stephen's Green and Nassau Street) reduce the
+  street to a crawl rather than closing it outright — a slow zone, not
+  a closure.
+source: >
+  Representative of Transport Infrastructure Ireland / Luas Cross City
+  track-maintenance works notices affecting Dawson Street.
+disruptions:
+  - id: dawson_st_works
+    shape: corridor
+    effect: slow_zone
+    description: Dawson Street reduced to roughly a fifth of normal speed for the works.
+    citation: "Representative of TII / Luas Cross City track maintenance notices"
+    waypoints:
+      - [53.3382, -6.2591]   # St Stephen's Green, Dawson Street junction
+      - [53.3423, -6.2577]   # Dawson Street / Nassau Street junction
+    speed_factor: 0.2
+    time_window: [0, 604800]
+    severity: 0.5

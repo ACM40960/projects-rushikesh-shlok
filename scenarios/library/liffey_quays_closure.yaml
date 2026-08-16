@@ -1,0 +1,22 @@
+schema_version: 1
+name: liffey_quays_closure
+description: >
+  A section of the north quays (Bachelors Walk / Eden Quay, between
+  O'Connell Bridge and Butt Bridge) closed for an incident — a real
+  recurring disruption type on Dublin's quays (burst watermain,
+  flooding, a Garda incident). No time window: modelled as closed for
+  the whole run, unlike the other three (planned, time-bounded) events
+  in this library.
+source: >
+  Representative of Dublin City Council / AA Roadwatch quay-closure
+  notices — Bachelors Walk / Eden Quay is a frequently affected stretch.
+disruptions:
+  - id: north_quays_closure
+    shape: corridor
+    effect: closure
+    description: North quays closed both directions between O'Connell Bridge and Butt Bridge.
+    citation: "Representative of AA Roadwatch / DCC quay incident closure notices"
+    waypoints:
+      - [53.3478, -6.2597]   # O'Connell Bridge, north side
+      - [53.3480, -6.2560]   # Butt Bridge, north side
+    severity: 0.9

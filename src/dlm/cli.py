@@ -10,7 +10,7 @@ modules land:
   ``random`` / ``list`` / ``show`` / ``map``.
 - Stage 3 adds ``dlm instance matrix``.
 - Stage 4 adds ``dlm plan``.
-- Stage 5 adds ``dlm disrupt validate`` / ``preview`` / ``new``.
+- Stage 5 adds ``dlm disrupt list`` / ``validate`` / ``preview`` / ``new``.
 - Stage 6 adds ``dlm compare``.
 - Stage 7 adds ``dlm batch``.
 
@@ -39,6 +39,9 @@ app.add_typer(network_app, name="network")
 
 instance_app = typer.Typer(help="Build and inspect delivery instances (depot + N stops).")
 app.add_typer(instance_app, name="instance")
+
+disrupt_app = typer.Typer(help="Author, validate, and preview disruption scenarios.")
+app.add_typer(disrupt_app, name="disrupt")
 
 
 def _version_callback(value: bool) -> None:
@@ -496,6 +499,192 @@ def plan(
     typer.echo(f"T1 (total time):   {t1.total_time_s:.1f}s")
     typer.echo(f"distance:          {t1.distance_m:.1f}m")
     typer.echo(f"written to:        {run_dir}")
+
+
+def _scenario_template(name: str, shape: object, effect: object) -> str:  # noqa: ANN001
+    from dlm.disruption.schema import DisruptionEffect, DisruptionShape
+
+    geometry_lines = {
+        DisruptionShape.EDGE: (
+            "    from_latlon: [53.3498, -6.2603]   # TODO: replace with real points\n"
+            "    to_latlon: [53.3478, -6.2597]\n"
+        ),
+        DisruptionShape.NODE: "    at: [53.3498, -6.2603]   # TODO: replace with a real point\n",
+        DisruptionShape.CORRIDOR: (
+            "    waypoints:                        # TODO: replace with real waypoints, in order\n"
+            "      - [53.3498, -6.2603]\n"
+            "      - [53.3478, -6.2597]\n"
+        ),
+        DisruptionShape.POLYGON: (
+            "    boundary:                         # TODO: replace with a real boundary ring\n"
+            "      - [53.3490, -6.2610]\n"
+            "      - [53.3490, -6.2595]\n"
+            "      - [53.3505, -6.2595]\n"
+            "      - [53.3505, -6.2610]\n"
+        ),
+    }
+    effect_line = (
+        "    speed_factor: 0.5   # fraction of normal speed, 0 < x < 1\n"
+        if (effect is DisruptionEffect.SLOW_ZONE)
+        else ""
+    )
+    return (
+        f"schema_version: 1\n"
+        f"name: {name}\n"
+        f"description: TODO\n"
+        f"disruptions:\n"
+        f"  - id: {name}_1\n"
+        f"    shape: {shape.value}\n"
+        f"    effect: {effect.value}\n"
+        f"{geometry_lines[shape]}"
+        f"{effect_line}"
+        f"    severity: 1.0\n"
+    )
+
+
+@disrupt_app.command("list")
+def disrupt_list() -> None:
+    """List every scenario YAML file found under `scenarios/` (recursive)."""
+    from dlm.config import settings
+    from dlm.disruption.schema import list_scenarios, load_scenario
+
+    paths = list_scenarios()
+    if not paths:
+        typer.echo(f"No scenarios found in {settings.scenarios_dir}.")
+        return
+    for path in paths:
+        rel = path.relative_to(settings.scenarios_dir)
+        try:
+            sc = load_scenario(path)
+            typer.echo(f"{path.stem} ({rel}): {len(sc.disruptions)} disruption(s)")
+        except Exception as exc:  # noqa: BLE001 - report bad YAML, not a crash
+            typer.echo(f"{path.stem} ({rel}): INVALID — {exc}")
+
+
+@disrupt_app.command("validate")
+def disrupt_validate(scenario: str = typer.Option(..., "--scenario")) -> None:
+    """Resolve every disruption in a scenario against the real Dublin
+    graph and report problems, without applying anything."""
+    from dlm.disruption.engine import validate_scenario
+    from dlm.disruption.schema import ScenarioNotFoundError, find_scenario, load_scenario
+    from dlm.network.loader import build_graph
+
+    try:
+        path = find_scenario(scenario)
+    except ScenarioNotFoundError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    try:
+        sc = load_scenario(path)
+    except Exception as exc:  # noqa: BLE001 - report bad YAML, not a crash
+        typer.echo(f"Error: {path} is not a valid scenario: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    graph, _ = build_graph()
+    report = validate_scenario(graph, sc)
+
+    typer.echo(f"scenario:          {sc.name} ({path})")
+    typer.echo(f"disruptions:       {report.n_disruptions}")
+    for disruption_id, count in report.resolved_edge_counts.items():
+        typer.echo(f"  {disruption_id}: resolves to {count} edge(s)")
+    if report.valid:
+        typer.echo("status:            VALID")
+        return
+    typer.echo("status:            INVALID")
+    for err in report.errors:
+        typer.echo(f"  - {err}")
+    raise typer.Exit(code=1)
+
+
+@disrupt_app.command("preview")
+def disrupt_preview(
+    scenario: str = typer.Option(..., "--scenario"),
+    at_time: float | None = typer.Option(
+        None,
+        "--at-time",
+        help="Seconds since scenario start; omit to apply every disruption regardless "
+        "of its time window.",
+    ),
+    out: str | None = typer.Option(None, "--out", help="Output HTML path."),
+) -> None:
+    """Apply a scenario to the real Dublin graph, report the audit (edges
+    closed/slowed, whether the graph is still strongly connected), and
+    render a map of the affected edges."""
+    import networkx as nx
+
+    from dlm.config import settings
+    from dlm.disruption.engine import DisruptionResolutionError, apply_scenario
+    from dlm.disruption.schema import ScenarioNotFoundError, find_scenario, load_scenario
+    from dlm.network.loader import build_graph
+    from dlm.viz.folium_map import save_disruption_map
+
+    try:
+        path = find_scenario(scenario)
+    except ScenarioNotFoundError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    sc = load_scenario(path)
+
+    graph, _ = build_graph()
+    try:
+        result = apply_scenario(graph, sc, at_time=at_time)
+    except DisruptionResolutionError as exc:
+        typer.echo(f"Error applying {scenario!r}: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    still_connected = nx.is_strongly_connected(result.graph)
+
+    typer.echo(f"scenario:          {sc.name} ({path})")
+    typer.echo(f"edges closed:      {result.n_edges_closed}")
+    typer.echo(f"edges slowed:      {result.n_edges_slowed}")
+    typer.echo(f"strongly connected after: {still_connected}")
+
+    out_path = (
+        Path(out) if out else settings.results_dir / "disruption_previews" / f"{scenario}.html"
+    )
+    saved = save_disruption_map(result, out_path)
+    typer.echo(f"map written to:    {saved}")
+
+
+@disrupt_app.command("new")
+def disrupt_new(
+    name: str = typer.Option(..., "--name", help="Scenario name (used as the save filename)."),
+    shape: str = typer.Option(..., "--shape", help="edge | node | corridor | polygon"),
+    effect: str = typer.Option(..., "--effect", help="closure | slow_zone"),
+    force: bool = typer.Option(
+        False, "--force", help="Overwrite an existing scenario of this name."
+    ),
+) -> None:
+    """Scaffold a new scenario YAML at `scenarios/<name>.yaml` with a
+    template disruption for the given shape/effect, ready to hand-edit."""
+    from dlm.config import settings
+    from dlm.disruption.schema import DisruptionEffect, DisruptionShape
+
+    try:
+        shape_enum = DisruptionShape(shape)
+    except ValueError as exc:
+        typer.echo(
+            f"Unknown shape {shape!r}. Choices: {', '.join(s.value for s in DisruptionShape)}"
+        )
+        raise typer.Exit(code=1) from exc
+    try:
+        effect_enum = DisruptionEffect(effect)
+    except ValueError as exc:
+        typer.echo(
+            f"Unknown effect {effect!r}. Choices: {', '.join(e.value for e in DisruptionEffect)}"
+        )
+        raise typer.Exit(code=1) from exc
+
+    path = settings.scenarios_dir / f"{name}.yaml"
+    if path.exists() and not force:
+        typer.echo(f"Scenario {name!r} already exists at {path}. Use --force to overwrite.")
+        raise typer.Exit(code=1)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(_scenario_template(name, shape_enum, effect_enum), encoding="utf-8")
+    typer.echo(f"Scaffolded {path}")
+    typer.echo(f"Edit the placeholder geometry, then: dlm disrupt validate --scenario {name}")
 
 
 if __name__ == "__main__":

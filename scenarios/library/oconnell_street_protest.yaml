@@ -1,0 +1,26 @@
+schema_version: 1
+name: oconnell_street_protest
+description: >
+  A city-centre protest gathering and march around the GPO and
+  O'Connell Street — a recurring real event type in Dublin (union
+  marches, political rallies), modelled as a polygon closure over the
+  street and its immediate footprint.
+source: >
+  Representative of recurring O'Connell Street rally/protest closures
+  reported in An Garda Síochána traffic advisories and Dublin City
+  Council event-closure notices for major O'Connell Street gatherings.
+disruptions:
+  - id: gpo_protest_area
+    shape: polygon
+    effect: closure
+    description: >
+      O'Connell Street closed between Parnell Street and the bridge,
+      including the Henry Street / Abbey Street junctions.
+    citation: "Representative of Garda / DCC O'Connell Street event closure notices"
+    boundary:
+      - [53.3465, -6.2625]
+      - [53.3465, -6.2580]
+      - [53.3530, -6.2580]
+      - [53.3530, -6.2625]
+    time_window: [0, 10800]
+    severity: 0.8

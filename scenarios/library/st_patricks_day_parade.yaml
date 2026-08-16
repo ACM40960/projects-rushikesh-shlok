@@ -1,0 +1,29 @@
+schema_version: 1
+name: st_patricks_day_parade
+description: >
+  Dublin's St Patrick's Day Parade route: from Parnell Square down
+  O'Connell Street, across O'Connell Bridge, along D'Olier Street and
+  College Green, then down Dame Street to Christ Church — closed to
+  traffic for the parade's duration. One of Dublin's largest annual
+  planned road closures.
+source: >
+  Route corresponds to the published St Patrick's Festival parade route
+  (Parnell Square -> O'Connell Street -> O'Connell Bridge -> D'Olier
+  Street -> College Green -> Dame Street -> Christ Church Place), as
+  published in Dublin City Council / An Garda Síochána traffic notices
+  for the parade.
+disruptions:
+  - id: parade_corridor
+    shape: corridor
+    effect: closure
+    description: Full parade route, closed both directions for the parade's duration.
+    citation: "St Patrick's Festival parade route, published annually by Dublin City Council"
+    waypoints:
+      - [53.3538, -6.2637]   # Parnell Square
+      - [53.3498, -6.2603]   # O'Connell Street / GPO
+      - [53.3478, -6.2597]   # O'Connell Bridge
+      - [53.3452, -6.2583]   # D'Olier Street / College Green
+      - [53.3444, -6.2674]   # Dame Street / City Hall
+      - [53.3434, -6.2708]   # Christ Church Place
+    time_window: [0, 14400]
+    severity: 1.0

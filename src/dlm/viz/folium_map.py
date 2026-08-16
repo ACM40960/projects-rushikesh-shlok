@@ -3,7 +3,8 @@
 Stage 2 introduces :func:`render_instance_map` (``dlm instance map``) so
 stop selection is visually checkable before any UI exists. Stage 4 adds
 :func:`render_route_map` (``dlm plan``), drawing the solved route's actual
-street-following geometry. Disruption layers are added in Stages 5-6.
+street-following geometry. Stage 5 adds :func:`render_disruption_map`
+(``dlm disrupt preview``). Before/after comparison layers land in Stage 6.
 """
 
 from __future__ import annotations
@@ -13,12 +14,16 @@ from pathlib import Path
 import folium
 import networkx as nx
 
+from dlm.disruption.engine import DisruptionResult
 from dlm.instance.schema import Instance
 from dlm.solver.base import Solution
 
 _DEPOT_COLOR = "black"
 _STOP_COLOR = "blue"
 _ROUTE_COLOR = "#2c7fb8"
+_CLOSED_COLOR = "#d7191c"
+_SLOWED_COLOR = "#fd8d3c"
+_DUBLIN_CENTRE = (53.3498, -6.2603)
 
 
 def render_instance_map(instance: Instance) -> folium.Map:
@@ -134,5 +139,64 @@ def save_route_map(
     """Render and save a route map as a standalone HTML file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     m = render_route_map(instance, solution, graph)
+    m.save(str(path))
+    return path
+
+
+def _edge_coords(graph: nx.MultiDiGraph, u: int, v: int, attrs: dict) -> list[tuple[float, float]]:
+    """(lat, lon) points to draw for edge (u, v) given its attribute dict:
+    its real OSM geometry where present (most edges — see
+    `dlm.network.loader`), else a straight line between the two endpoint
+    nodes."""
+    if "geometry" in attrs:
+        return [(lat, lon) for lon, lat in attrs["geometry"].coords]
+    return [(graph.nodes[u]["y"], graph.nodes[u]["x"]), (graph.nodes[v]["y"], graph.nodes[v]["x"])]
+
+
+def render_disruption_map(result: DisruptionResult) -> folium.Map:
+    """Render a Folium map highlighting one scenario application's effect:
+    closed edges in red, slowed edges in orange, each drawn along its real
+    street geometry (not a straight line between endpoints).
+
+    Node coordinates come from `result.graph` — safe even for closed edges,
+    since removing an edge never removes its endpoint nodes.
+    """
+    graph = result.graph
+    if result.changes:
+        lats = [graph.nodes[n]["y"] for c in result.changes for n in (c.u, c.v)]
+        lons = [graph.nodes[n]["x"] for c in result.changes for n in (c.u, c.v)]
+        center = (sum(lats) / len(lats), sum(lons) / len(lons))
+    else:
+        center = _DUBLIN_CENTRE
+
+    m = folium.Map(location=list(center), zoom_start=15)
+
+    for change in result.changes:
+        if change.kind == "removed":
+            attrs = change.original_attrs
+            color = _CLOSED_COLOR
+            tooltip = f"CLOSED ({change.disruption_id})"
+        else:
+            attrs = graph[change.u][change.v][change.key]
+            color = _SLOWED_COLOR
+            tooltip = (
+                f"SLOWED {change.original_travel_time_s:.0f}s -> "
+                f"{change.new_travel_time_s:.0f}s ({change.disruption_id})"
+            )
+        coords = _edge_coords(graph, change.u, change.v, attrs)
+        folium.PolyLine(coords, color=color, weight=5, opacity=0.9, tooltip=tooltip).add_to(m)
+
+    all_lats = [graph.nodes[n]["y"] for c in result.changes for n in (c.u, c.v)]
+    all_lons = [graph.nodes[n]["x"] for c in result.changes for n in (c.u, c.v)]
+    if all_lats:
+        m.fit_bounds([[min(all_lats), min(all_lons)], [max(all_lats), max(all_lons)]])
+
+    return m
+
+
+def save_disruption_map(result: DisruptionResult, path: Path) -> Path:
+    """Render and save a disruption map as a standalone HTML file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    m = render_disruption_map(result)
     m.save(str(path))
     return path

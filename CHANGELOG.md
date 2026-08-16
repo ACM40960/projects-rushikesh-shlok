@@ -154,3 +154,42 @@ One section per stage. Dates are UTC.
   asserted), monotone 2-opt trajectories, degenerate sizes (N=0/1/2),
   N=8/20/40 on the real canonical instances, T1 breakdown consistency, and
   re-run determinism.
+
+## Stage 5 — Disruption engine (2026-08-16)
+
+- `dlm.disruption.schema`: `Disruption` (shape: edge/node/corridor/polygon
+  x effect: closure/slow_zone) and `Scenario`; `load_scenario` /
+  `list_scenarios` / `find_scenario`, mirroring `instance/presets.py`'s
+  pattern.
+- `dlm.disruption.engine.apply_scenario`: resolves every disruption's
+  geometry **once, up front, against the pristine graph** (so a corridor's
+  shortest-path resolution never depends on scenario list order), then
+  applies effects to a **copy** of the graph — closures always beat slow
+  zones on the same edge, first-listed wins within one effect (both
+  documented, not silent). `DisruptionResult.revert()` undoes changes on
+  that copy in place — measured **0.0003s** on the real graph (53 closed
+  edges), versus ~1.3s for a fresh `apply_scenario` copy.
+- `validate_scenario`: resolves a scenario's geometry without applying
+  anything, for `dlm disrupt validate`.
+- Four curated, cited, real Dublin scenarios (`scenarios/library/`): the
+  St Patrick's Day parade route (corridor closure, 53 edges), an
+  O'Connell Street protest (polygon closure, 58 edges), Luas Cross City
+  works on Dawson Street (corridor slow zone, 2 edges), and a north-quays
+  incident closure (corridor closure, 44 edges).
+- `dlm.viz.folium_map.render_disruption_map`: closed edges in red, slowed
+  in orange, along each edge's real OSM geometry.
+- `dlm disrupt list` / `validate` / `preview` / `new` CLI.
+- Real finding: all three closure scenarios genuinely disconnect the real
+  Dublin graph (strongly-connected before, not after); the slow-zone
+  scenario never can, since it never removes an edge — reported as-is,
+  exactly the situation Stage 6's `infeasible` information-model state
+  exists for.
+- Amendment to Stage 0: the `src/dlm/disruption/library/` stub directory
+  (a README only) is retired — curated scenario YAML now lives in
+  `scenarios/library/`, matching `scenarios/README.md`'s own description
+  of where curated scenarios belong.
+- 30 new tests (96 total): 19 offline (schema validation, all shape x
+  effect combinations on the fixture graph, revert exactness, the
+  up-front-resolution and closure-beats-slow-zone conflict rules) + 11
+  network-marked (all four curated scenarios validate and apply cleanly,
+  the disconnection finding, revert timing on the real graph).
