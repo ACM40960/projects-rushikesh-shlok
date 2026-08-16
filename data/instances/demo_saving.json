@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "name": "demo_saving",
+  "depot": {
+    "id": "depot",
+    "label": "Depot (53.35270, -6.24710)",
+    "lat": 53.3527,
+    "lon": -6.2471,
+    "node": 131037935,
+    "demand": 0.0,
+    "service_time_s": 0.0,
+    "time_window": null,
+    "source": "latlon"
+  },
+  "stops": [
+    {
+      "id": "s1",
+      "label": "Random 1",
+      "lat": 53.3847729,
+      "lon": -6.4082382,
+      "node": 955310305,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    },
+    {
+      "id": "s2",
+      "label": "Random 2",
+      "lat": 53.3906591,
+      "lon": -6.2570654,
+      "node": 27393722,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    },
+    {
+      "id": "s3",
+      "label": "Random 3",
+      "lat": 53.3897318,
+      "lon": -6.4185242,
+      "node": 12435743,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    },
+    {
+      "id": "s4",
+      "label": "Random 4",
+      "lat": 53.2844963,
+      "lon": -6.2368508,
+      "node": 60965967,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    },
+    {
+      "id": "s5",
+      "label": "Random 5",
+      "lat": 53.3373621,
+      "lon": -6.2309216,
+      "node": 443062010,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    },
+    {
+      "id": "s6",
+      "label": "Random 6",
+      "lat": 53.3686396,
+      "lon": -6.2359399,
+      "node": 247176923,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "random"
+    }
+  ],
+  "fleet_size": 1,
+  "vehicle_capacity": null,
+  "seed": 37,
+  "created_at": "2026-08-16T19:29:39.403528Z"
+}

@@ -1,0 +1,18 @@
+schema_version: 1
+name: demo_saving_showcase
+description: >
+  Not a curated real-world event — a deliberately engineered demo scenario
+  for the demo_saving instance, closing Samuel Beckett Bridge on the
+  first leg of the baseline route. Built to show a genuine, reproducible
+  positive Saving %: the frozen order is forced into a costly detour,
+  while re-optimising the remaining stops from the blockage point finds
+  a materially cheaper order — cheaper even than the original undisrupted
+  plan.
+disruptions:
+  - id: samuel_beckett_bridge_closure
+    shape: edge
+    effect: closure
+    description: Samuel Beckett Bridge closed both directions.
+    from_latlon: [53.3476215, -6.2411872]
+    to_latlon: [53.347561, -6.2411963]
+    severity: 1.0
