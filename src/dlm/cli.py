@@ -6,8 +6,9 @@ CLI command here. Sub-commands are added stage by stage as their underlying
 modules land:
 
 - Stage 1 adds ``dlm network build`` / ``dlm network stats``.
-- Stage 2 adds ``dlm instance new`` / ``add`` / ``remove`` / ``random`` / ``list`` / ``show`` /
-  ``map``.
+- Stage 2 adds ``dlm instance new`` / ``add`` / ``remove`` / ``move`` / ``rename`` /
+  ``random`` / ``list`` / ``show`` / ``map``.
+- Stage 3 adds ``dlm instance matrix``.
 - Stage 4 adds ``dlm plan``.
 - Stage 5 adds ``dlm disrupt validate`` / ``preview`` / ``new``.
 - Stage 6 adds ``dlm compare``.
@@ -363,6 +364,43 @@ def instance_map(
     out_path = Path(out) if out else settings.results_dir / "instance_maps" / f"{name}.html"
     saved = save_instance_map(builder.instance, out_path)
     typer.echo(f"Map written to {saved}")
+
+
+@instance_app.command("matrix")
+def instance_matrix(
+    name: str = typer.Option(..., "--name"),
+    force: bool = typer.Option(False, "--force", help="Ignore the cache and rebuild."),
+) -> None:
+    """Build (or load from cache) the travel-time matrix over an instance's
+    depot + stops, and report its stats."""
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+
+    path = _instance_path(name)
+    if not path.exists():
+        typer.echo(
+            f"No instance named {name!r} (looked in {path}). Create one with `dlm instance new`."
+        )
+        raise typer.Exit(code=1)
+
+    graph, report = build_graph()
+    builder = InstanceBuilder.load(graph, path)
+    try:
+        inst = builder.build()
+    except Exception as exc:  # noqa: BLE001 - report validation problems, not a crash
+        typer.echo(f"Instance {name!r} is not ready: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+    _, stats = build_matrix(graph, nodes, graph_id=report.cache_path.stem, force_rebuild=force)
+
+    typer.echo(f"cache:              {'hit' if stats.from_cache else 'built fresh'}")
+    typer.echo(f"build time:         {stats.build_seconds:.3f}s")
+    typer.echo(f"points:             {stats.n_points}")
+    typer.echo(f"ordered pairs:      {stats.n_ordered_pairs}")
+    typer.echo(f"asymmetric pairs:   {stats.asymmetric_pairs} ({100 * stats.asymmetry_rate:.1f}%)")
+    typer.echo(f"triangle violations: {stats.triangle_violations}")
 
 
 if __name__ == "__main__":

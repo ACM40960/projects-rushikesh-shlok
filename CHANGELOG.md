@@ -93,3 +93,31 @@ One section per stage. Dates are UTC.
   pattern as ADR-0002, one layer up) for this sandbox's headless-browser
   networking, used once to produce the committed
   `docs/report/instance_map_small.png` acceptance-evidence screenshot.
+
+## Stage 3 — Travel-time matrix (2026-08-16)
+
+- `dlm.instance.matrix.Matrix`: cached, `O(1)`-lookup cost + full-path
+  matrix over an instance's depot + stops, built with one Dijkstra per
+  point (not one per pair).
+- Incremental `add_point`/`remove_point`/`move_point`: adding one point
+  costs exactly two more Dijkstras (directed graph, one search each way
+  via a reversed graph view), never a full rebuild — measured **14.5x**
+  faster than a full rebuild on a real 21-point instance, with byte-identical
+  results.
+- `recompute_on(graph)`: rebuild the same point set against a different
+  graph (for Stage 5's disrupted views), bypassing the disk cache.
+- Disk cache keyed by `(graph identity, sorted node set, weight)`, shared
+  across instances with the same points; cache hit is near-instant
+  (0.004s vs. 13.9-15.5s for a fresh 21-point build).
+- `MatrixStats`: asymmetry rate (>95% on every real Dublin instance tested
+  — the expected signature of a genuinely directed, one-way-heavy street
+  network) and triangle-inequality violation count (zero on every matrix
+  built, which is a correctness guarantee for shortest-path costs on a
+  single static graph, not a coincidence — explained in
+  `docs/stages/stage-03-matrix.md`).
+- `dlm instance matrix` CLI command.
+- 12 new tests (51 total): hand-derived costs/paths on the tiny fixture
+  graph (independently computed, not just re-calling networkx), incremental
+  vs. full-rebuild equality and speedup (both fixture and real graph),
+  save/load round-trip, and the N=20 build-time/cache-instant acceptance
+  criteria.
