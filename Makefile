@@ -34,7 +34,7 @@ figures:
 	$(VENV)/bin/dlm figures
 
 app:
-	@echo "make app: lands in Stage 10 (docs/stages/stage-10-ui.md)"; exit 1
+	$(VENV)/bin/streamlit run app/main.py
 
 # Regenerates every number and figure in the report, end to end, from a
 # cold cache: the Dublin graph, the batch T1/T2/T3/Saving % experiment

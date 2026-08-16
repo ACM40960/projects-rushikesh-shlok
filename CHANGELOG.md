@@ -316,3 +316,26 @@ One section per stage. Dates are UTC.
   project's working `.venv/`) installs `.[dev,ui,fleet]` cleanly and
   passes the full 146-test suite; `dlm batch`/`dlm sensitivity` produce
   byte-identical CSVs across two independent runs.
+
+## Stage 10 — UI (2026-08-16)
+
+- `app/state.py`: `st.session_state` helpers plus thin orchestration
+  (`run_plan`, `run_compare`, instance CRUD, listings) — the same
+  `dlm.*` call sequence `dlm.cli`'s `plan`/`compare` commands use, no
+  new domain logic.
+- `app/main.py`: single scrolling Streamlit page — instance
+  builder (preset/address/lat-lon/random/map-click), instance map,
+  `T1` plan section (single-vehicle or fleet), disruption comparison
+  section (`T2`/`T3`/`Saving %` + before/after maps). Map-click-to-add-
+  a-stop wires through to `StopSource.MAP_CLICK`, exactly as
+  `builder.py` documented since Stage 2 that Stage 10 would.
+- `make app`: wired to `streamlit run app/main.py` (was a Stage 0 stub).
+- `tests/test_cli_ui_parity.py`: 4 new tests using `typer.testing
+  .CliRunner` to run `dlm plan`/`dlm compare` in-process and assert
+  `app.state`'s equivalent functions produce identical `T1`/`T2`/`T3`
+  for the same inputs — single-vehicle, fleet, a disruption comparison,
+  and the fleet-instance rejection. 150 tests total, all pass.
+- Verified in a real browser (headless Chromium via Playwright): golden
+  path (load instance -> view map -> plan -> compare) and an infeasible-
+  `T2`/`T3` edge case both render correctly; screenshots committed to
+  `docs/report/ui_*.png`.

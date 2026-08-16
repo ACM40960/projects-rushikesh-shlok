@@ -47,7 +47,7 @@ The full pipeline now runs end-to-end via:
 
 ```bash
 make reproduce   # regenerates every number and figure in the report (~10 min, warm cache)
-make app         # Stage 10: launches the Streamlit UI
+make app         # launches the Streamlit UI
 ```
 
 ## Repository layout
@@ -76,7 +76,7 @@ docs/             architecture, modelling, data provenance, ADRs, one doc per st
 | 7 | Results harness | ✅ |
 | 8 | Fleet & benchmark | ✅ |
 | 9 | Hardening | ✅ |
-| 10 | UI | ⬜ |
+| 10 | UI | ✅ |
 
 See `docs/stages/` for one write-up per completed stage (goal, design,
 interfaces, acceptance evidence, limitations).

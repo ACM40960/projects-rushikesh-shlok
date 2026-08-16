@@ -1,12 +1,13 @@
 # Architecture
 
-Finalised in Stage 9: every module below exists, is tested, and is wired
-into `dlm.cli` (see `docs/cli.md` for the full command reference). This
-document was a forward-looking draft from Stage 0 through Stage 8; the
-pipeline it now describes is the real one, not a planned one — the
-diagram matches actual data flow through `dlm.network` /
-`dlm.instance` / `dlm.solver` / `dlm.disruption` / `dlm.simulation` /
-`dlm.viz`, as exercised by `make reproduce`.
+Complete as of Stage 10: every module below exists, is tested, and is
+wired into `dlm.cli` (see `docs/cli.md` for the full command reference),
+with `app/` as the thin client over all of it. This document was a
+forward-looking draft from Stage 0 through Stage 8; the pipeline it now
+describes is the real one, not a planned one — the diagram matches
+actual data flow through `dlm.network` / `dlm.instance` / `dlm.solver` /
+`dlm.disruption` / `dlm.simulation` / `dlm.viz`, as exercised by `make
+reproduce` and, one layer up, by `app/main.py`.
 
 ## Pipeline
 
@@ -27,7 +28,7 @@ flowchart LR
     J --> M[Compare + Saving %]
     L --> M
     M --> N[Map + figures + report tables]
-    N --> O["Stage 10: barebones UI<br/>(thin client over all of the above)"]
+    N --> O["Streamlit UI<br/>(thin client over all of the above)"]
 ```
 
 The OR-Tools branch (`Z`) is a benchmark oracle only (Stage 8) — it never
@@ -47,7 +48,7 @@ solver from OR-Tools' answer," reported via `dlm benchmark`.
 | `dlm.simulation` | Route execution under an information model, re-planning, T1/T2/T3/Saving % | Stage 6 |
 | `dlm.viz` | Folium interactive maps, matplotlib report figures | Stages 2, 4–7 |
 | `dlm.cli` | Typer CLI — the only way `app/` is allowed to reach the pipeline | All stages |
-| `app/` | Streamlit thin client: widget layout and session-state plumbing only, no domain logic | Stage 10 |
+| `app/` | Streamlit thin client: widget layout and session-state plumbing only, no domain logic (`app/state.py` orchestrates `dlm.*` calls, `app/main.py` is widgets only) | Stage 10 |
 
 ## What each stage actually added to the pipeline
 
@@ -67,20 +68,24 @@ solver from OR-Tools' answer," reported via `dlm benchmark`.
   (figures, sensitivity).
 - **Stage 8** extended `C`/`E` to `K>1` (fleet, Clarke-Wright) and added
   the `Z` benchmark branch (OR-Tools).
-- **Stage 9** (this stage) didn't add a pipeline stage — it closed the
-  loop: `make reproduce` runs the whole diagram end to end from a cold
-  cache, `docs/cli.md` documents every entry point into it, and
+- **Stage 9** didn't add a pipeline stage — it closed the loop: `make
+  reproduce` runs the whole diagram end to end from a cold cache,
+  `docs/cli.md` documents every entry point into it, and
   `docs/limitations.md` consolidates what it doesn't model.
+- **Stage 10** added `O`: `app/main.py`, a Streamlit thin client whose
+  every action calls `app/state.py`, which calls the same `dlm.*`
+  functions `dlm.cli` calls — never a second implementation.
 
 ## Architectural law: the UI is a thin client
 
-Every capability the Stage 10 UI exposes must already exist as a tested CLI
-command by Stage 9. If routing, solving, disruption, or metric logic is
-found inside `app/`, that is a bug in the architecture, not a stylistic
-preference — move it into `src/dlm/` and expose it through `dlm.cli` first.
-`tests/test_cli_ui_parity.py` (Stage 10) enforces this: the same inputs
-through the CLI and through the UI's underlying function calls must produce
-identical `T1`/`T2`/`T3`.
+Every capability the UI exposes must already exist as a tested CLI
+command. If routing, solving, disruption, or metric logic is found inside
+`app/`, that is a bug in the architecture, not a stylistic preference —
+move it into `src/dlm/` and expose it through `dlm.cli` first.
+`tests/test_cli_ui_parity.py` enforces this concretely: it runs `dlm
+plan`/`dlm compare` in-process and asserts the UI's underlying function
+calls (`app.state.run_plan`/`run_compare`) produce identical `T1`/`T2`/
+`T3` for the same inputs.
 
 ## Determinism and caching
 
