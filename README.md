@@ -43,10 +43,10 @@ make setup   # creates .venv, installs the package + dev/ui/fleet extras, instal
 make test    # runs the test suite
 ```
 
-Once later stages land, the full pipeline will run end-to-end via:
+The full pipeline now runs end-to-end via:
 
 ```bash
-make reproduce   # Stage 9: regenerates every number and figure in the report
+make reproduce   # regenerates every number and figure in the report (~10 min, warm cache)
 make app         # Stage 10: launches the Streamlit UI
 ```
 
@@ -75,7 +75,7 @@ docs/             architecture, modelling, data provenance, ADRs, one doc per st
 | 6 | Experiment core (T1/T2/T3) | ✅ |
 | 7 | Results harness | ✅ |
 | 8 | Fleet & benchmark | ✅ |
-| 9 | Hardening | ⬜ |
+| 9 | Hardening | ✅ |
 | 10 | UI | ⬜ |
 
 See `docs/stages/` for one write-up per completed stage (goal, design,
@@ -85,5 +85,5 @@ interfaces, acceptance evidence, limitations).
 
 Start at `docs/index.md`. Key documents: `docs/architecture.md` (data flow),
 `docs/modelling.md` (the maths), `docs/data.md` (OSM provenance and
-licensing), `docs/limitations.md`, `docs/glossary.md`, `docs/adr/` (decision
-records).
+licensing), `docs/cli.md` (full command reference), `docs/limitations.md`,
+`docs/glossary.md`, `docs/adr/` (decision records).

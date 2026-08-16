@@ -19,8 +19,10 @@ limitations, and what the next stage depends on.
   Architecture Decision Record per non-obvious choice.
 - **Confused by a term?** `docs/glossary.md`.
 - **Want the honest list of what this system does not model?**
-  `docs/limitations.md`. Consolidated in Stage 9, but honest limitations are
-  recorded in each stage's own doc as they're discovered.
+  `docs/limitations.md`, consolidated in Stage 9 from every stage doc's
+  own "Known limitations" section.
+- **Want the full command reference?** `docs/cli.md`. Landing from
+  Stage 9.
 
 ## Documents by stage
 

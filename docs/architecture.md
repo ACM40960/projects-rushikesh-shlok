@@ -1,18 +1,23 @@
 # Architecture
 
-First draft, written in Stage 0. This will be finalised in Stage 9 once
-every module exists and the real data flow (rather than the planned one) is
-known.
+Finalised in Stage 9: every module below exists, is tested, and is wired
+into `dlm.cli` (see `docs/cli.md` for the full command reference). This
+document was a forward-looking draft from Stage 0 through Stage 8; the
+pipeline it now describes is the real one, not a planned one — the
+diagram matches actual data flow through `dlm.network` /
+`dlm.instance` / `dlm.solver` / `dlm.disruption` / `dlm.simulation` /
+`dlm.viz`, as exercised by `make reproduce`.
 
-## Pipeline (planned)
+## Pipeline
 
 ```mermaid
 flowchart LR
     A[OSM Dublin] --> B[Routable graph<br/>+ travel times]
-    B --> C["Instance: depot + N stops<br/>(N and places chosen by user)"]
+    B --> C["Instance: depot + N stops, K vehicles<br/>(N/K and places chosen by user)"]
     C --> D[Travel-time matrix<br/>+ path store]
-    D --> E[Baseline solve<br/>NN + 2-opt]
+    D --> E["Baseline solve<br/>K=1: NN + 2-opt<br/>K&gt;1: Clarke-Wright + 2-opt"]
     E --> F[T1: normal cost]
+    E -.benchmark oracle.-> Z[OR-Tools]
     G[Disruption:<br/>YAML or drawn] --> H[Disrupted graph view]
     F --> I[Execute frozen route<br/>on disrupted graph]
     H --> I
@@ -25,20 +30,47 @@ flowchart LR
     N --> O["Stage 10: barebones UI<br/>(thin client over all of the above)"]
 ```
 
+The OR-Tools branch (`Z`) is a benchmark oracle only (Stage 8) — it never
+feeds `T1`/`T2`/`T3`, it exists to answer "how far is the hand-implemented
+solver from OR-Tools' answer," reported via `dlm benchmark`.
+
 ## Module responsibilities
 
-| Module | Responsibility | Lands in |
+| Module | Responsibility | Landed in |
 |---|---|---|
 | `dlm.config` | Paths, seed, units policy, log level — the single source of defaults | Stage 0 |
 | `dlm.logging_conf` | Structured logging setup | Stage 0 |
 | `dlm.network` | Download/cache the Dublin graph, impute travel times, snap points | Stage 1 |
 | `dlm.instance` | Depot/Stop/Instance schema, mutable builder, presets, geocoding, travel-time matrix | Stages 2–3 |
-| `dlm.solver` | `Solver` protocol, Nearest Neighbour + 2-opt, Clarke-Wright, OR-Tools benchmark | Stages 4, 8 |
-| `dlm.disruption` | Scenario schema, application engine, generators, curated library | Stage 5 |
+| `dlm.solver` | `Solver` protocol, Nearest Neighbour + 2-opt, Clarke-Wright (fleet), OR-Tools benchmark | Stages 4, 8 |
+| `dlm.disruption` | Scenario schema, application engine, seeded random generators, curated library | Stages 5, 7 |
 | `dlm.simulation` | Route execution under an information model, re-planning, T1/T2/T3/Saving % | Stage 6 |
 | `dlm.viz` | Folium interactive maps, matplotlib report figures | Stages 2, 4–7 |
 | `dlm.cli` | Typer CLI — the only way `app/` is allowed to reach the pipeline | All stages |
 | `app/` | Streamlit thin client: widget layout and session-state plumbing only, no domain logic | Stage 10 |
+
+## What each stage actually added to the pipeline
+
+- **Stage 1** made `A -> B` real (OSMnx download, cached, travel times
+  imputed from `maxspeed`).
+- **Stage 2** made `C` real and user-driven (address/lat-lon/preset/
+  random stops, not fixed test fixtures).
+- **Stage 3** made `D` real and incremental (cached travel-time matrix,
+  built once per instance's node set).
+- **Stage 4** made `E -> F` real (`T1`, via NN + 2-opt).
+- **Stage 5** made `G -> H` real (scenario YAML resolved against the
+  pristine graph into a disrupted graph view).
+- **Stage 6** made `I -> J -> K -> L -> M` real (`T2`/`T3`/`Saving %`
+  under an explicit information model).
+- **Stage 7** made the pipeline repeatable at scale (`dlm batch` running
+  many (instance, scenario) pairs at once) and turned `M` into `N`
+  (figures, sensitivity).
+- **Stage 8** extended `C`/`E` to `K>1` (fleet, Clarke-Wright) and added
+  the `Z` benchmark branch (OR-Tools).
+- **Stage 9** (this stage) didn't add a pipeline stage — it closed the
+  loop: `make reproduce` runs the whole diagram end to end from a cold
+  cache, `docs/cli.md` documents every entry point into it, and
+  `docs/limitations.md` consolidates what it doesn't model.
 
 ## Architectural law: the UI is a thin client
 

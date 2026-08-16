@@ -294,3 +294,25 @@ One section per stage. Dates are UTC.
   savings values are hand-derivable, capacity/fleet-size interaction) +
   4 network-marked (the canonical `fleet` instance, OR-Tools K=1/K>1
   parity, the VRPTW drop-one-stop demonstration).
+
+## Stage 9 — Hardening (2026-08-16)
+
+- `make reproduce`: chains `dlm network build` -> `dlm batch` ->
+  `dlm figures` -> `dlm sensitivity` -> `dlm benchmark`, regenerating
+  every number and figure the report depends on from a cold cache
+  (~10 minutes warm-cache, measured).
+- Fixed `make network`: it had been left as a Stage-0 stub ("lands in
+  Stage 1") for eight stages despite `dlm network build` existing since
+  Stage 1 — nothing exercised the Makefile target itself, only the CLI
+  command directly, so it went unnoticed until this stage's grep-based
+  audit.
+- `docs/limitations.md`: consolidated from the "Known limitations"
+  section of all nine prior stage docs, organised by theme.
+- `docs/cli.md`: full reference for all 20 `dlm` subcommands.
+- `docs/architecture.md`: rewritten from "first draft / planned
+  pipeline" to describe the real, completed pipeline, with a per-stage
+  "what it actually added" section.
+- Hardening checks: a from-scratch `venv` (independent of this
+  project's working `.venv/`) installs `.[dev,ui,fleet]` cleanly and
+  passes the full 146-test suite; `dlm batch`/`dlm sensitivity` produce
+  byte-identical CSVs across two independent runs.

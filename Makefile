@@ -24,10 +24,8 @@ format:
 precommit-install:
 	$(VENV)/bin/pre-commit install
 
-# --- Stages 1+ (not yet implemented) -----------------------------------
-
 network:
-	@echo "dlm network build: lands in Stage 1 (docs/stages/stage-01-network.md)"; exit 1
+	$(VENV)/bin/dlm network build
 
 experiment:
 	$(VENV)/bin/dlm batch
@@ -38,8 +36,18 @@ figures:
 app:
 	@echo "make app: lands in Stage 10 (docs/stages/stage-10-ui.md)"; exit 1
 
+# Regenerates every number and figure in the report, end to end, from a
+# cold cache: the Dublin graph, the batch T1/T2/T3/Saving % experiment
+# (docs/report/batch_results.csv), its figures, the service-time
+# sensitivity sweep, and the hand-implemented-vs-OR-Tools benchmark.
+# Each `dlm` subcommand builds/caches whatever graph or matrix it needs,
+# so this is safe to run from a fresh clone.
 reproduce:
-	@echo "make reproduce: lands in Stage 9 (docs/stages/stage-09-hardening.md)"; exit 1
+	$(VENV)/bin/dlm network build
+	$(VENV)/bin/dlm batch
+	$(VENV)/bin/dlm figures
+	$(VENV)/bin/dlm sensitivity
+	$(VENV)/bin/dlm benchmark
 
 clean:
 	rm -rf $(VENV) .pytest_cache .ruff_cache **/__pycache__
