@@ -12,7 +12,7 @@ modules land:
 - Stage 4 adds ``dlm plan``.
 - Stage 5 adds ``dlm disrupt list`` / ``validate`` / ``preview`` / ``new``.
 - Stage 6 adds ``dlm compare``.
-- Stage 7 adds ``dlm batch``.
+- Stage 7 adds ``dlm batch``, ``dlm figures``, ``dlm sensitivity``.
 
 This file intentionally has no domain logic — every command is a thin
 wrapper that parses arguments and calls into ``dlm.network`` / ``dlm.instance``
@@ -848,6 +848,313 @@ def disrupt_new(
     path.write_text(_scenario_template(name, shape_enum, effect_enum), encoding="utf-8")
     typer.echo(f"Scaffolded {path}")
     typer.echo(f"Edit the placeholder geometry, then: dlm disrupt validate --scenario {name}")
+
+
+@app.command("batch")
+def batch(
+    instances: str = typer.Option(
+        "small,medium,large", "--instances", help="Comma-separated instance names."
+    ),
+    n_random: int = typer.Option(
+        10, "--n-random", help="Seeded random scenarios to add on top of the curated library."
+    ),
+    seed: int = typer.Option(42, "--seed", help="Base seed for random scenario generation."),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Also write the results CSV here (default docs/report/batch_results.csv).",
+    ),
+    solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+) -> None:
+    """Run T1/T2/T3/Saving % across every (instance, scenario) pair — the
+    curated scenario library plus `--n-random` seeded random scenarios —
+    and write an aggregate results table.
+
+    Writes `results/batch-<timestamp>/{config.yaml, batch_results.csv,
+    summary.json}`, and a copy of the CSV to `--out` (the committed
+    dataset `dlm figures` and the report are built from).
+    """
+    import json
+    from datetime import UTC, datetime
+
+    import pandas as pd
+    import yaml
+
+    from dlm.config import REPO_ROOT, settings
+    from dlm.disruption.engine import DisruptionResolutionError, apply_scenario
+    from dlm.disruption.generators import generate_random_scenarios
+    from dlm.disruption.schema import list_scenarios, load_scenario
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.simulation.execution import InformationModel
+    from dlm.simulation.metrics import (
+        compute_saving,
+        compute_t1,
+        compute_t2,
+        compute_t3,
+        compute_t3_oracle,
+    )
+    from dlm.solver.nearest_neighbour import NearestNeighbourSolver
+    from dlm.solver.two_opt import TwoOptSolver
+
+    instance_names = [s.strip() for s in instances.split(",") if s.strip()]
+    solvers = {"nn_2opt": TwoOptSolver(), "nearest_neighbour": NearestNeighbourSolver()}
+    if solver not in solvers:
+        typer.echo(f"Unknown solver {solver!r}. Choices: {', '.join(solvers)}")
+        raise typer.Exit(code=1)
+
+    graph, graph_report = build_graph()
+
+    curated_paths = [p for p in list_scenarios() if p.parent.name == "library"]
+    scenarios = [(load_scenario(p), "curated") for p in curated_paths]
+    if n_random > 0:
+        scenarios += [
+            (sc, "random") for sc in generate_random_scenarios(graph, n_random, base_seed=seed)
+        ]
+
+    rows: list[dict] = []
+    for inst_name in instance_names:
+        path = _instance_path(inst_name)
+        if not path.exists():
+            typer.echo(f"Skipping unknown instance {inst_name!r} (looked in {path}).")
+            continue
+        inst = InstanceBuilder.load(graph, path).build()
+        nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+        matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+        solution = solvers[solver].solve(inst, matrix)
+        t1 = compute_t1(inst, solution)
+
+        for sc, kind in scenarios:
+            try:
+                result = apply_scenario(graph, sc)
+            except DisruptionResolutionError as exc:
+                typer.echo(f"  {inst_name} / {sc.name}: skipped, resolution failed: {exc}")
+                continue
+            d0 = sc.disruptions[0]
+            t2_omni = compute_t2(inst, solution, result.graph, InformationModel.OMNISCIENT)
+            t2_reactive = compute_t2(inst, solution, result.graph, InformationModel.REACTIVE)
+            t3 = compute_t3(inst, solution, result.graph)
+            t3_oracle = compute_t3_oracle(inst, result.graph)
+            rows.append(
+                {
+                    "instance": inst_name,
+                    "n_stops": inst.n_stops,
+                    "scenario": sc.name,
+                    "scenario_kind": kind,
+                    "shape": d0.shape.value,
+                    "effect": d0.effect.value,
+                    "edges_closed": result.n_edges_closed,
+                    "edges_slowed": result.n_edges_slowed,
+                    "T1_total_s": t1.total_time_s,
+                    "T2_omniscient_feasible": t2_omni.feasible,
+                    "T2_omniscient_total_s": t2_omni.total_time_s,
+                    "T2_reactive_feasible": t2_reactive.feasible,
+                    "T2_reactive_total_s": t2_reactive.total_time_s,
+                    "T3_feasible": t3.feasible,
+                    "T3_triggered": t3.triggered,
+                    "T3_total_s": t3.total_time_s,
+                    "T3_oracle_feasible": t3_oracle.feasible,
+                    "T3_oracle_total_s": t3_oracle.total_time_s,
+                    "saving_pct": compute_saving(t2_reactive, t3),
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    run_id = f"batch-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(run_dir / "batch_results.csv", index=False)
+
+    config = {
+        "instances": instance_names,
+        "n_random": n_random,
+        "seed": seed,
+        "solver": solver,
+        "n_curated_scenarios": len(curated_paths),
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    saving_values = df["saving_pct"].dropna()
+    summary = {
+        "n_runs": len(df),
+        "n_feasible_t2_reactive": int(df["T2_reactive_feasible"].sum()),
+        "n_feasible_t3": int(df["T3_feasible"].sum()),
+        "mean_saving_pct": float(saving_values.mean()) if len(saving_values) else None,
+    }
+    (run_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+
+    out_path = Path(out) if out else REPO_ROOT / "docs" / "report" / "batch_results.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
+
+    typer.echo(f"instances:         {', '.join(instance_names)}")
+    typer.echo(f"scenarios:         {len(curated_paths)} curated + {n_random} random")
+    typer.echo(f"runs:              {len(df)}")
+    typer.echo(f"T2(reactive) feasible: {summary['n_feasible_t2_reactive']}/{len(df)}")
+    typer.echo(f"T3 feasible:       {summary['n_feasible_t3']}/{len(df)}")
+    if summary["mean_saving_pct"] is not None:
+        typer.echo(f"mean Saving %:     {summary['mean_saving_pct']:.1f}%")
+    typer.echo(f"written to:        {run_dir}")
+    typer.echo(f"also written to:   {out_path}")
+
+
+@app.command("figures")
+def figures(
+    results_csv: str | None = typer.Option(
+        None, "--results", help="Batch results CSV (default docs/report/batch_results.csv)."
+    ),
+    instance: str | None = typer.Option(
+        None,
+        "--instance",
+        help="Instance for the per-scenario comparison figure (default: first in file).",
+    ),
+    out: str | None = typer.Option(
+        None, "--out", help="Output directory (default docs/report/figures)."
+    ),
+) -> None:
+    """Regenerate the report's figures from a `dlm batch` results CSV.
+
+    Pure post-processing: reads a CSV, writes PNG+SVG figures — no graph,
+    instance, or solver access needed, so this is fast and safe to re-run
+    any time the CSV or the figure styling changes.
+    """
+    from dlm.config import REPO_ROOT
+    from dlm.viz.figures import make_all_figures
+
+    csv_path = (
+        Path(results_csv) if results_csv else REPO_ROOT / "docs" / "report" / "batch_results.csv"
+    )
+    if not csv_path.exists():
+        typer.echo(f"No results CSV at {csv_path}. Run `dlm batch` first.")
+        raise typer.Exit(code=1)
+    out_dir = Path(out) if out else REPO_ROOT / "docs" / "report" / "figures"
+
+    written = make_all_figures(csv_path, out_dir, instance=instance)
+    for png_path, svg_path in written:
+        typer.echo(f"wrote {png_path.name} / {svg_path.name}")
+    typer.echo(f"written to:        {out_dir}")
+
+
+@app.command("sensitivity")
+def sensitivity(
+    instances: str = typer.Option(
+        "small,medium,large", "--instances", help="Comma-separated instance names."
+    ),
+    values: str = typer.Option(
+        "60,120,180,240,300",
+        "--values",
+        help="Comma-separated default_service_time_s values to sweep, in seconds.",
+    ),
+    solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Also write the results CSV here (default docs/report/sensitivity_results.csv).",
+    ),
+) -> None:
+    """Sweep `default_service_time_s` and report how sensitive `T1` is —
+    the concrete check ADR-0004 (Stage 4) asked for before its 180s
+    default is treated as final.
+
+    Each instance is solved once (the solver never sees service time —
+    Stage 4's `compute_t1` docstring — so the route and `drive_time_s`
+    are identical at every value); only `service_time_s`/`total_time_s`
+    and service time's share of the total change.
+    """
+    import json
+    from datetime import UTC, datetime
+
+    import pandas as pd
+    import yaml
+
+    from dlm.config import REPO_ROOT, settings
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.simulation.metrics import compute_t1
+    from dlm.solver.nearest_neighbour import NearestNeighbourSolver
+    from dlm.solver.two_opt import TwoOptSolver
+
+    instance_names = [s.strip() for s in instances.split(",") if s.strip()]
+    try:
+        service_time_values = [float(v.strip()) for v in values.split(",") if v.strip()]
+    except ValueError as exc:
+        typer.echo(f"--values must be comma-separated numbers, got {values!r}")
+        raise typer.Exit(code=1) from exc
+    solvers = {"nn_2opt": TwoOptSolver(), "nearest_neighbour": NearestNeighbourSolver()}
+    if solver not in solvers:
+        typer.echo(f"Unknown solver {solver!r}. Choices: {', '.join(solvers)}")
+        raise typer.Exit(code=1)
+
+    graph, graph_report = build_graph()
+
+    rows: list[dict] = []
+    for inst_name in instance_names:
+        path = _instance_path(inst_name)
+        if not path.exists():
+            typer.echo(f"Skipping unknown instance {inst_name!r} (looked in {path}).")
+            continue
+        inst = InstanceBuilder.load(graph, path).build()
+        nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+        matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+        solution = solvers[solver].solve(inst, matrix)
+
+        for value in service_time_values:
+            t1 = compute_t1(inst, solution, default_service_time_s=value)
+            rows.append(
+                {
+                    "instance": inst_name,
+                    "n_stops": inst.n_stops,
+                    "default_service_time_s": value,
+                    "drive_time_s": t1.drive_time_s,
+                    "service_time_s": t1.service_time_s,
+                    "total_time_s": t1.total_time_s,
+                    "service_time_share_pct": 100.0 * t1.service_time_s / t1.total_time_s,
+                }
+            )
+
+    df = pd.DataFrame(rows)
+    run_id = f"sensitivity-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(run_dir / "sensitivity_results.csv", index=False)
+    config = {
+        "instances": instance_names,
+        "values": service_time_values,
+        "solver": solver,
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    (run_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "min_service_time_share_pct": float(df["service_time_share_pct"].min()),
+                "max_service_time_share_pct": float(df["service_time_share_pct"].max()),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    out_path = Path(out) if out else REPO_ROOT / "docs" / "report" / "sensitivity_results.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
+
+    for inst_name in instance_names:
+        sub = df[df["instance"] == inst_name]
+        if sub.empty:
+            continue
+        typer.echo(f"{inst_name} (drive time fixed at {sub['drive_time_s'].iloc[0]:.1f}s):")
+        for _, row in sub.iterrows():
+            typer.echo(
+                f"  service_time={row['default_service_time_s']:.0f}s -> "
+                f"T1={row['total_time_s']:.1f}s "
+                f"(service time = {row['service_time_share_pct']:.1f}% of T1)"
+            )
+    typer.echo(f"written to:        {run_dir}")
+    typer.echo(f"also written to:   {out_path}")
 
 
 if __name__ == "__main__":

@@ -231,3 +231,37 @@ One section per stage. Dates are UTC.
   `T1==T2==T3` no-op regression test, `T3_oracle` mechanics) + 7
   network-marked (all four curated scenarios end-to-end, the real
   infeasibility/recovery finding above).
+
+## Stage 7 — Results harness (2026-08-16)
+
+- `dlm.disruption.generators.generate_random_scenario`/
+  `generate_random_scenarios`: seeded random disruptions drawn from a
+  graph's own real nodes/edges (a real edge, a real node, a short
+  real-edge random walk for a corridor, a small box around a real node
+  for a polygon) — deterministic given `(seed, graph)`, always resolves.
+- `dlm batch`: runs `T1`/`T2` (omniscient + reactive)/`T3`/`T3_oracle`/
+  `Saving %` across every (instance, scenario) pair (default: 3 canonical
+  instances x 14 scenarios = 42 runs, ~9 minutes), writes
+  `results/batch-<timestamp>/` and a committed
+  `docs/report/batch_results.csv`.
+- `dlm.viz.figures` + `dlm figures`: three colourblind-safe (Okabe-Ito),
+  PNG+SVG report figures built purely from that CSV — no solver/
+  disruption/simulation dependency, so figures regenerate instantly.
+- `dlm sensitivity`: sweeps `default_service_time_s` — the concrete
+  check ADR-0004 (Stage 4) asked for. Real answer: service time is
+  **35-44% of `T1`** at the current 180s default, **15-57%** across a
+  60-300s sweep — a genuinely large sensitivity, documented as an update
+  to ADR-0004 rather than left as a hypothetical.
+- `make experiment` / `make figures` wired to `dlm batch` / `dlm
+  figures` (previously stub targets since Stage 0).
+- Real finding: of 30 seeded-random scenarios in the default batch, 0
+  affected any canonical instance's route (despite every one of them
+  closing/slowing real edges) — routes touch a tiny fraction of the
+  graph's 62,068 edges, which is exactly why the curated, real-world-
+  anchored scenario library is what produces every non-trivial `T2`/`T3`
+  result. Reported directly, including in the `Saving %` distribution
+  figure (a real single spike at 0%), not hidden.
+- 22 new tests (135 total), all offline: 16 for
+  `dlm.disruption.generators` (determinism, every shape x effect
+  combination, real-graph resolution) + 6 for `dlm.viz.figures`
+  (including infeasible-row and empty-distribution edge cases).

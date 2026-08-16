@@ -30,10 +30,10 @@ network:
 	@echo "dlm network build: lands in Stage 1 (docs/stages/stage-01-network.md)"; exit 1
 
 experiment:
-	@echo "make experiment: lands in Stage 7 (docs/stages/stage-07-results.md)"; exit 1
+	$(VENV)/bin/dlm batch
 
 figures:
-	@echo "make figures: lands in Stage 7 (docs/stages/stage-07-results.md)"; exit 1
+	$(VENV)/bin/dlm figures
 
 app:
 	@echo "make app: lands in Stage 10 (docs/stages/stage-10-ui.md)"; exit 1

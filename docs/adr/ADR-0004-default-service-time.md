@@ -62,3 +62,15 @@ consistent with "prefer a clear implementation over a clever one") and
 revisit only if the report's findings turn out to be sensitive to this
 choice — worth a quick sensitivity check in Stage 7's batch experiments
 rather than guessing now.
+
+## Stage 7 update: the sensitivity check ran, and the answer is yes
+
+`dlm sensitivity` (`docs/stages/stage-07-results.md`) swept
+`default_service_time_s` from 60s to 300s against all three canonical
+instances. At the current 180s default, service time is already
+**35-44% of `T1`**; across the full sweep it ranges from **15% to 57%**
+of the total. This is not a minor detail — it moves every headline
+`T1`/`T2`/`T3` number substantially. The two open questions above (keep
+180s or pick another value; fixed or category-dependent) are still open
+and still need your input — this update only confirms that the answer
+matters, not what it should be.
