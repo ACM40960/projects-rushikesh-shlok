@@ -2,10 +2,17 @@
 
 The graph is downloaded once from the public Overpass API, reduced to the
 largest strongly connected component so every node can reach every other,
-and then cached to disk as a single ``.graphml`` file keyed by a hash of the
+and then cached to disk as a single pickle file keyed by a hash of the
 inputs that determine its content (area, network type, simplify flag,
 OSMnx version). A second call with the same inputs loads from that cache
 instead of re-downloading.
+
+The cache is pickle, not OSMnx's usual ``.graphml``: this graph (Greater
+Dublin, tens of thousands of nodes) took >10s to parse from XML on second
+load, well past the <5s target, while pickle — a fine choice for a purely
+internal, gitignored cache with no interchange requirement — loads the
+same graph in well under a second. See docs/stages/stage-01-network.md
+for the measured numbers.
 
 The actual HTTP fetch is done with ``curl`` via subprocess rather than
 OSMnx's own ``requests``-based transport — see the note on
@@ -18,6 +25,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import pickle
 import subprocess
 import tempfile
 import time
@@ -33,14 +41,16 @@ from dlm.network.travel_time import TravelTimeStats, add_travel_times
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_BBOX = (-6.3400, 53.2900, -6.1500, 53.3850)
+DEFAULT_BBOX = (-6.4200, 53.2800, -6.1000, 53.4700)
 """(left, bottom, right, top) i.e. (west, south, east, north), WGS84 degrees.
 
-Covers Dublin city centre plus UCD Belfield to the south-east and Dublin
-Port to the east — enough to route between the landmark stops used in this
-project's acceptance tests and worked examples, without downloading the
-much larger, slower M50-catchment area. See docs/data.md and ADR proposals
-in docs/stages/stage-01-network.md for the city-centre-vs-M50 trade-off.
+Covers Greater Dublin: the city centre, UCD Belfield, Dublin Port, Dublin
+Airport, and the Tallaght / Blanchardstown / Dun Laoghaire / Swords
+suburbs — resolved in ADR-0003 (Stage 2) once the curated preset list
+(``data/presets/dublin_locations.yaml``) made the practical need for these
+concrete: several "recognisable Dublin locations" (the airport, outer
+suburbs, out-of-town shopping centres) fell outside Stage 1's original,
+smaller bbox. Still short of the full M50 catchment. See docs/data.md.
 """
 
 NETWORK_TYPE = "drive"
@@ -67,7 +77,7 @@ class GraphBuildReport:
     travel_time_stats : TravelTimeStats
         Coverage of real vs. imputed speeds.
     cache_path : Path
-        Where the graphml is cached on disk.
+        Where the graph is cached on disk.
     from_cache : bool
         True if this build was loaded from disk rather than downloaded.
     build_seconds : float
@@ -92,7 +102,7 @@ def _cache_key(bbox: tuple[float, float, float, float], network_type: str, simpl
 
 def _cache_path(bbox: tuple[float, float, float, float], network_type: str, simplify: bool) -> Path:
     key = _cache_key(bbox, network_type, simplify)
-    return settings.cache_dir / f"dublin_{network_type}_{key}.graphml"
+    return settings.cache_dir / f"dublin_{network_type}_{key}.pkl"
 
 
 def _build_overpass_query(bbox: tuple[float, float, float, float], network_type: str) -> str:
@@ -204,7 +214,7 @@ def build_graph(
         segments) — standard OSMnx behaviour, keeps the graph a reasonable
         size without changing route geometry.
     force_rebuild : bool
-        If True, ignore any cached graphml and re-download.
+        If True, ignore any cached graph and re-download.
 
     Returns
     -------
@@ -219,12 +229,8 @@ def build_graph(
     t0 = time.time()
 
     if cache_path.exists() and not force_rebuild:
-        G = ox.load_graphml(cache_path)
-        # graphml round-trips numeric edge attributes as strings; restore them.
-        for _u, _v, _k, data in G.edges(keys=True, data=True):
-            data["travel_time"] = float(data["travel_time"])
-            data["speed_kph"] = float(data["speed_kph"])
-            data["length"] = float(data["length"])
+        with cache_path.open("rb") as f:
+            G = pickle.load(f)  # noqa: S301 - our own cache, never untrusted input
         stats = TravelTimeStats(
             n_edges=G.number_of_edges(),
             n_real_maxspeed=sum(
@@ -253,7 +259,8 @@ def build_graph(
     G = ox.truncate.largest_component(G_raw, strongly=True)
     G, stats = add_travel_times(G)
 
-    ox.save_graphml(G, cache_path)
+    with cache_path.open("wb") as f:
+        pickle.dump(G, f, protocol=pickle.HIGHEST_PROTOCOL)
 
     report = GraphBuildReport(
         n_nodes=G.number_of_nodes(),

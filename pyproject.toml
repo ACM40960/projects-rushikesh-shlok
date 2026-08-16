@@ -37,6 +37,7 @@ dev = [
     "pytest-cov>=4.1",
     "ruff>=0.4",
     "pre-commit>=3.7",
+    "playwright>=1.40",
 ]
 
 [project.scripts]

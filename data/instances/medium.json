@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "name": "medium",
+  "depot": {
+    "id": "depot",
+    "label": "Dublin Port",
+    "lat": 53.3527704,
+    "lon": -6.2245117,
+    "node": 26759862,
+    "demand": 0.0,
+    "service_time_s": 0.0,
+    "time_window": null,
+    "source": "address"
+  },
+  "stops": [
+    {
+      "id": "s1",
+      "label": "Mater Misericordiae University Hospital",
+      "lat": 53.3592257,
+      "lon": -6.2670593,
+      "node": 26866909,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s2",
+      "label": "St James's Hospital",
+      "lat": 53.3401224,
+      "lon": -6.295578,
+      "node": 365307095,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s3",
+      "label": "Beaumont Hospital",
+      "lat": 53.3894874,
+      "lon": -6.2247288,
+      "node": 95203793,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s4",
+      "label": "Tallaght University Hospital",
+      "lat": 53.2911982,
+      "lon": -6.3788781,
+      "node": 653874564,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s5",
+      "label": "Trinity College Dublin",
+      "lat": 53.3448759,
+      "lon": -6.2532061,
+      "node": 1497243682,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s6",
+      "label": "University College Dublin (Belfield)",
+      "lat": 53.3095032,
+      "lon": -6.2271487,
+      "node": 223828343,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s7",
+      "label": "Dublin City University",
+      "lat": 53.3865964,
+      "lon": -6.2589686,
+      "node": 273128874,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s8",
+      "label": "Grafton Street",
+      "lat": 53.3420874,
+      "lon": -6.2598865,
+      "node": 32236033,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s9",
+      "label": "Henry Street",
+      "lat": 53.3494687,
+      "lon": -6.2624082,
+      "node": 9294784122,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s10",
+      "label": "Dundrum Town Centre",
+      "lat": 53.2870344,
+      "lon": -6.2421875,
+      "node": 243189071,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s11",
+      "label": "Blanchardstown Centre",
+      "lat": 53.3932751,
+      "lon": -6.3920415,
+      "node": 876378758,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s12",
+      "label": "Rathmines",
+      "lat": 53.3265199,
+      "lon": -6.2648571,
+      "node": 337429610,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s13",
+      "label": "Ranelagh",
+      "lat": 53.3252185,
+      "lon": -6.2550504,
+      "node": 665818,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s14",
+      "label": "Swords",
+      "lat": 53.4581587,
+      "lon": -6.2105356,
+      "node": 317492476,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s15",
+      "label": "Tallaght",
+      "lat": 53.2878082,
+      "lon": -6.362355,
+      "node": 4238246,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s16",
+      "label": "Ballsbridge",
+      "lat": 53.3291947,
+      "lon": -6.2313316,
+      "node": 32335093,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s17",
+      "label": "Dublin Airport",
+      "lat": 53.4286619,
+      "lon": -6.2425901,
+      "node": 7173877946,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s18",
+      "label": "Connolly Station",
+      "lat": 53.3527247,
+      "lon": -6.2471357,
+      "node": 131037935,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s19",
+      "label": "Dublin Castle",
+      "lat": 53.3426623,
+      "lon": -6.2670042,
+      "node": 3211234671,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s20",
+      "label": "Croke Park",
+      "lat": 53.3603576,
+      "lon": -6.2509812,
+      "node": 1540661083,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    }
+  ],
+  "fleet_size": 1,
+  "vehicle_capacity": null,
+  "seed": 2,
+  "created_at": "2026-08-16T10:52:27.508464Z"
+}

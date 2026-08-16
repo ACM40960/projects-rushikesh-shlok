@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "name": "small",
+  "depot": {
+    "id": "depot",
+    "label": "Dublin Port",
+    "lat": 53.3527704,
+    "lon": -6.2245117,
+    "node": 26759862,
+    "demand": 0.0,
+    "service_time_s": 0.0,
+    "time_window": null,
+    "source": "address"
+  },
+  "stops": [
+    {
+      "id": "s1",
+      "label": "Trinity College Dublin",
+      "lat": 53.3448759,
+      "lon": -6.2532061,
+      "node": 1497243682,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s2",
+      "label": "Grafton Street",
+      "lat": 53.3420874,
+      "lon": -6.2598865,
+      "node": 32236033,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s3",
+      "label": "Mater Misericordiae University Hospital",
+      "lat": 53.3592257,
+      "lon": -6.2670593,
+      "node": 26866909,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s4",
+      "label": "Rathmines",
+      "lat": 53.3265199,
+      "lon": -6.2648571,
+      "node": 337429610,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s5",
+      "label": "Connolly Station",
+      "lat": 53.3527247,
+      "lon": -6.2471357,
+      "node": 131037935,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s6",
+      "label": "Dublin Castle",
+      "lat": 53.3426623,
+      "lon": -6.2670042,
+      "node": 3211234671,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s7",
+      "label": "Ballsbridge",
+      "lat": 53.3291947,
+      "lon": -6.2313316,
+      "node": 32335093,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s8",
+      "label": "Croke Park",
+      "lat": 53.3603576,
+      "lon": -6.2509812,
+      "node": 1540661083,
+      "demand": 0.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    }
+  ],
+  "fleet_size": 1,
+  "vehicle_capacity": null,
+  "seed": 1,
+  "created_at": "2026-08-16T10:52:25.553928Z"
+}

@@ -1,0 +1,163 @@
+# Curated Dublin location presets — Stage 2.
+#
+# ~30 recognisable Dublin locations spanning hospitals, universities,
+# shopping streets/centres, suburbs, transport hubs, and landmarks, so a
+# demo instance can be built by name instead of raw coordinates.
+#
+# Coordinates are geocoded via Nominatim (see dlm.instance.geocode), with
+# six exceptions (large campuses / an airport / a park / big out-of-town
+# retail centres) where the geocoded centroid is farther than the default
+# snap-distance guard from any drivable road — those instead use the
+# nearest real drivable access point, found by nearest-node search
+# against the Stage 1 graph rather than guessed. See
+# docs/stages/stage-02-instances.md.
+
+- name: "Mater Misericordiae University Hospital"
+  lat: 53.3592257
+  lon: -6.2670593
+  category: hospital
+
+- name: "St James's Hospital"
+  lat: 53.3401224
+  lon: -6.295578
+  category: hospital
+
+- name: "St Vincent's University Hospital"
+  lat: 53.3183099
+  lon: -6.2116375
+  category: hospital
+
+- name: "Beaumont Hospital"
+  lat: 53.3894874
+  lon: -6.2247288
+  category: hospital
+
+- name: "Tallaght University Hospital"
+  lat: 53.2911982
+  lon: -6.3788781
+  category: hospital
+
+- name: "Trinity College Dublin"
+  lat: 53.3448759
+  lon: -6.2532061
+  category: university
+
+- name: "University College Dublin (Belfield)"
+  lat: 53.3095032
+  lon: -6.2271487
+  category: university
+
+- name: "Dublin City University"
+  lat: 53.3865964
+  lon: -6.2589686
+  category: university
+
+- name: "TU Dublin (Grangegorman)"
+  lat: 53.3524776
+  lon: -6.2786799
+  category: university
+
+- name: "Grafton Street"
+  lat: 53.3420874
+  lon: -6.2598865
+  category: retail
+
+- name: "Henry Street"
+  lat: 53.3494687
+  lon: -6.2624082
+  category: retail
+
+- name: "Dundrum Town Centre"
+  lat: 53.2870344
+  lon: -6.2421875
+  category: retail
+
+- name: "Blanchardstown Centre"
+  lat: 53.3932751
+  lon: -6.3920415
+  category: retail
+
+- name: "Liffey Valley Shopping Centre"
+  lat: 53.3550863
+  lon: -6.392476
+  category: retail
+
+- name: "Rathmines"
+  lat: 53.3265199
+  lon: -6.2648571
+  category: suburb
+
+- name: "Ranelagh"
+  lat: 53.3252185
+  lon: -6.2550504
+  category: suburb
+
+- name: "Clontarf"
+  lat: 53.3608138
+  lon: -6.1968538
+  category: suburb
+
+- name: "Dun Laoghaire"
+  lat: 53.2922794
+  lon: -6.1360079
+  category: suburb
+
+- name: "Swords"
+  lat: 53.4581587
+  lon: -6.2105356
+  category: suburb
+
+- name: "Tallaght"
+  lat: 53.2878082
+  lon: -6.362355
+  category: suburb
+
+- name: "Ballsbridge"
+  lat: 53.3291947
+  lon: -6.2313316
+  category: suburb
+
+- name: "Drumcondra"
+  lat: 53.3680988
+  lon: -6.2554727
+  category: suburb
+
+- name: "Dublin Airport"
+  lat: 53.4286619
+  lon: -6.2425901
+  category: transport_hub
+
+- name: "Connolly Station"
+  lat: 53.3527247
+  lon: -6.2471357
+  category: transport_hub
+
+- name: "Heuston Station"
+  lat: 53.3464352
+  lon: -6.2940557
+  category: transport_hub
+
+- name: "Busaras (Dublin Bus / Coach Station)"
+  lat: 53.3498177
+  lon: -6.2517722
+  category: transport_hub
+
+- name: "Tara Street Station"
+  lat: 53.3471418
+  lon: -6.2544968
+  category: transport_hub
+
+- name: "Dublin Castle"
+  lat: 53.3426623
+  lon: -6.2670042
+  category: landmark
+
+- name: "Croke Park"
+  lat: 53.3603576
+  lon: -6.2509812
+  category: landmark
+
+- name: "Phoenix Park"
+  lat: 53.3599698
+  lon: -6.3259525
+  category: landmark

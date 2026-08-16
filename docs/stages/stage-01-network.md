@@ -1,5 +1,15 @@
 # Stage 01 — Dublin road network
 
+> **Updated in Stage 2.** `DEFAULT_BBOX` was expanded (Dublin city centre →
+> Greater Dublin) and the graph cache format changed from `.graphml` to
+> pickle (the larger graph missed the <5s cache-load bar under graphml).
+> The node/edge counts and cache-load timings below are from the
+> *original*, smaller-bbox build. See
+> `docs/stages/stage-02-instances.md`'s "Amendments to Stage 1" section for
+> what changed, why, and the current numbers. Everything else on this page
+> — the design, the acceptance criteria, the ADR-0002 curl workaround —
+> still holds as written.
+
 ## Goal
 
 A cached, routable, travel-time-annotated graph of Dublin: the foundation

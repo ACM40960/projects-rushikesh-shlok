@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_147b97219e1d00c55f08455e6877b8a9 {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_147b97219e1d00c55f08455e6877b8a9" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_147b97219e1d00c55f08455e6877b8a9 = L.map(
+                "map_147b97219e1d00c55f08455e6877b8a9",
+                {
+                    center: [53.3527704, -6.2245117],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 13,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_1185611fdcdf186d0905a1b34ec3a461 = L.tileLayer(
+                "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 19,
+  "maxNativeZoom": 19,
+  "noWrap": false,
+  "attribution": "\u0026copy; \u003ca href=\"https://www.openstreetmap.org/copyright\"\u003eOpenStreetMap\u003c/a\u003e contributors",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_1185611fdcdf186d0905a1b34ec3a461.addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var marker_57e9ca738e9b5aae84b387b19db51315 = L.marker(
+                [53.3527704, -6.2245117],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_4bebbafb44698dec7f4896af62d21952 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "black",
+  "iconColor": "white",
+  "icon": "home",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_22af54bd9e0806ad740970f51a2b017e = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_ae4903ff7609f741e465130d52f275bc = $(`<div id="html_ae4903ff7609f741e465130d52f275bc" style="width: 100.0%; height: 100.0%;">Depot: Dublin Port (node 26759862)</div>`)[0];
+                popup_22af54bd9e0806ad740970f51a2b017e.setContent(html_ae4903ff7609f741e465130d52f275bc);
+            
+        
+
+        marker_57e9ca738e9b5aae84b387b19db51315.bindPopup(popup_22af54bd9e0806ad740970f51a2b017e)
+        ;
+
+        
+    
+    
+            marker_57e9ca738e9b5aae84b387b19db51315.bindTooltip(
+                `<div>
+                     Depot: Dublin Port
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_57e9ca738e9b5aae84b387b19db51315.setIcon(icon_4bebbafb44698dec7f4896af62d21952);
+            
+    
+            var marker_22411b17efb4bd794483797f9c35b22f = L.marker(
+                [53.3448759, -6.2532061],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_7d4bba2335791c1f538ad9a11ad4497d = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_8b275c0b6862318ef63928f137bcd792 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_db15b00c85a11839d1be1995230d581d = $(`<div id="html_db15b00c85a11839d1be1995230d581d" style="width: 100.0%; height: 100.0%;">s1: Trinity College Dublin (node 1497243682, source=preset)</div>`)[0];
+                popup_8b275c0b6862318ef63928f137bcd792.setContent(html_db15b00c85a11839d1be1995230d581d);
+            
+        
+
+        marker_22411b17efb4bd794483797f9c35b22f.bindPopup(popup_8b275c0b6862318ef63928f137bcd792)
+        ;
+
+        
+    
+    
+            marker_22411b17efb4bd794483797f9c35b22f.bindTooltip(
+                `<div>
+                     1. Trinity College Dublin
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_22411b17efb4bd794483797f9c35b22f.setIcon(icon_7d4bba2335791c1f538ad9a11ad4497d);
+            
+    
+            var marker_143122ffc52a43d825e4859c3f44f957 = L.marker(
+                [53.3420874, -6.2598865],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_0e82d0ca85d55bb910ffe83376b06061 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_0443acbc7ce267e69506894950f34ee3 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_c8dc31df70646718d2ac4ea45fb1495f = $(`<div id="html_c8dc31df70646718d2ac4ea45fb1495f" style="width: 100.0%; height: 100.0%;">s2: Grafton Street (node 32236033, source=preset)</div>`)[0];
+                popup_0443acbc7ce267e69506894950f34ee3.setContent(html_c8dc31df70646718d2ac4ea45fb1495f);
+            
+        
+
+        marker_143122ffc52a43d825e4859c3f44f957.bindPopup(popup_0443acbc7ce267e69506894950f34ee3)
+        ;
+
+        
+    
+    
+            marker_143122ffc52a43d825e4859c3f44f957.bindTooltip(
+                `<div>
+                     2. Grafton Street
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_143122ffc52a43d825e4859c3f44f957.setIcon(icon_0e82d0ca85d55bb910ffe83376b06061);
+            
+    
+            var marker_811de548df7cd4a5d3751478cdb57965 = L.marker(
+                [53.3592257, -6.2670593],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_7ec5cd9328b2f870d415dc27f5345576 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_9582d6dce733bdaa9c080a5eefe508a8 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_8d5cc561d4215cbe21d5abeb5ce52fbf = $(`<div id="html_8d5cc561d4215cbe21d5abeb5ce52fbf" style="width: 100.0%; height: 100.0%;">s3: Mater Misericordiae University Hospital (node 26866909, source=preset)</div>`)[0];
+                popup_9582d6dce733bdaa9c080a5eefe508a8.setContent(html_8d5cc561d4215cbe21d5abeb5ce52fbf);
+            
+        
+
+        marker_811de548df7cd4a5d3751478cdb57965.bindPopup(popup_9582d6dce733bdaa9c080a5eefe508a8)
+        ;
+
+        
+    
+    
+            marker_811de548df7cd4a5d3751478cdb57965.bindTooltip(
+                `<div>
+                     3. Mater Misericordiae University Hospital
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_811de548df7cd4a5d3751478cdb57965.setIcon(icon_7ec5cd9328b2f870d415dc27f5345576);
+            
+    
+            var marker_cf79a9315280d86f7e7907d81f10e432 = L.marker(
+                [53.3265199, -6.2648571],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_c6601bf2891cbdd91270ae2893dbd47b = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_b6dc57cea2a9cc3c0df0fd714968ae3a = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_d955e542939190f8ad408c207a2526fb = $(`<div id="html_d955e542939190f8ad408c207a2526fb" style="width: 100.0%; height: 100.0%;">s4: Rathmines (node 337429610, source=preset)</div>`)[0];
+                popup_b6dc57cea2a9cc3c0df0fd714968ae3a.setContent(html_d955e542939190f8ad408c207a2526fb);
+            
+        
+
+        marker_cf79a9315280d86f7e7907d81f10e432.bindPopup(popup_b6dc57cea2a9cc3c0df0fd714968ae3a)
+        ;
+
+        
+    
+    
+            marker_cf79a9315280d86f7e7907d81f10e432.bindTooltip(
+                `<div>
+                     4. Rathmines
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_cf79a9315280d86f7e7907d81f10e432.setIcon(icon_c6601bf2891cbdd91270ae2893dbd47b);
+            
+    
+            var marker_eed52f223c53923e62700719f9cae445 = L.marker(
+                [53.3527247, -6.2471357],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_067a3ca2b93195947740636346c02351 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_4998b5ecd1f54164fdea0af3dfdc9451 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_b3a03b26cca68db75b36685d998a8798 = $(`<div id="html_b3a03b26cca68db75b36685d998a8798" style="width: 100.0%; height: 100.0%;">s5: Connolly Station (node 131037935, source=preset)</div>`)[0];
+                popup_4998b5ecd1f54164fdea0af3dfdc9451.setContent(html_b3a03b26cca68db75b36685d998a8798);
+            
+        
+
+        marker_eed52f223c53923e62700719f9cae445.bindPopup(popup_4998b5ecd1f54164fdea0af3dfdc9451)
+        ;
+
+        
+    
+    
+            marker_eed52f223c53923e62700719f9cae445.bindTooltip(
+                `<div>
+                     5. Connolly Station
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_eed52f223c53923e62700719f9cae445.setIcon(icon_067a3ca2b93195947740636346c02351);
+            
+    
+            var marker_2a0704a3a8c3d74a10e1ccc75049e7fa = L.marker(
+                [53.3426623, -6.2670042],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_a215c0c80a20454978198b88ad8f58ed = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_e7af3e9d1b7fb5e2317bbe7410f2aaeb = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_d3cc72cd4074bdb0d395ee5bf54f73bc = $(`<div id="html_d3cc72cd4074bdb0d395ee5bf54f73bc" style="width: 100.0%; height: 100.0%;">s6: Dublin Castle (node 3211234671, source=preset)</div>`)[0];
+                popup_e7af3e9d1b7fb5e2317bbe7410f2aaeb.setContent(html_d3cc72cd4074bdb0d395ee5bf54f73bc);
+            
+        
+
+        marker_2a0704a3a8c3d74a10e1ccc75049e7fa.bindPopup(popup_e7af3e9d1b7fb5e2317bbe7410f2aaeb)
+        ;
+
+        
+    
+    
+            marker_2a0704a3a8c3d74a10e1ccc75049e7fa.bindTooltip(
+                `<div>
+                     6. Dublin Castle
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_2a0704a3a8c3d74a10e1ccc75049e7fa.setIcon(icon_a215c0c80a20454978198b88ad8f58ed);
+            
+    
+            var marker_dc19dd34b51d3d5139d27cffb769e820 = L.marker(
+                [53.3291947, -6.2313316],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_5712136148fd1df0cf9f74cfe70b3d32 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_65eab59ef9667b4b12774c228f8ee2fa = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_ab320fd862b57509661c230c0ea5e40a = $(`<div id="html_ab320fd862b57509661c230c0ea5e40a" style="width: 100.0%; height: 100.0%;">s7: Ballsbridge (node 32335093, source=preset)</div>`)[0];
+                popup_65eab59ef9667b4b12774c228f8ee2fa.setContent(html_ab320fd862b57509661c230c0ea5e40a);
+            
+        
+
+        marker_dc19dd34b51d3d5139d27cffb769e820.bindPopup(popup_65eab59ef9667b4b12774c228f8ee2fa)
+        ;
+
+        
+    
+    
+            marker_dc19dd34b51d3d5139d27cffb769e820.bindTooltip(
+                `<div>
+                     7. Ballsbridge
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_dc19dd34b51d3d5139d27cffb769e820.setIcon(icon_5712136148fd1df0cf9f74cfe70b3d32);
+            
+    
+            var marker_c8e16b4ed12d5809b14a99d5bdd7424a = L.marker(
+                [53.3603576, -6.2509812],
+                {
+}
+            ).addTo(map_147b97219e1d00c55f08455e6877b8a9);
+        
+    
+            var icon_86f6f0168bfde860e0174e024e26ee79 = L.AwesomeMarkers.icon(
+                {
+  "markerColor": "blue",
+  "iconColor": "white",
+  "icon": "info-sign",
+  "prefix": "glyphicon",
+  "extraClasses": "fa-rotate-0",
+}
+            );
+        
+    
+        var popup_68b096fa22bea2fb0544de7d22aa72d1 = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_49fe4febb68850643e36772a6c635c02 = $(`<div id="html_49fe4febb68850643e36772a6c635c02" style="width: 100.0%; height: 100.0%;">s8: Croke Park (node 1540661083, source=preset)</div>`)[0];
+                popup_68b096fa22bea2fb0544de7d22aa72d1.setContent(html_49fe4febb68850643e36772a6c635c02);
+            
+        
+
+        marker_c8e16b4ed12d5809b14a99d5bdd7424a.bindPopup(popup_68b096fa22bea2fb0544de7d22aa72d1)
+        ;
+
+        
+    
+    
+            marker_c8e16b4ed12d5809b14a99d5bdd7424a.bindTooltip(
+                `<div>
+                     8. Croke Park
+                 </div>`,
+                {
+  "sticky": true,
+}
+            );
+        
+    
+                marker_c8e16b4ed12d5809b14a99d5bdd7424a.setIcon(icon_86f6f0168bfde860e0174e024e26ee79);
+            
+    
+            map_147b97219e1d00c55f08455e6877b8a9.fitBounds(
+                [[53.3265199, -6.2670593], [53.3603576, -6.2245117]],
+                {}
+            );
+        
+</script>
+</html>

@@ -52,3 +52,44 @@ One section per stage. Dates are UTC.
   imputation, one-way/SCC structure, snapping success/failure, strong
   connectivity, a hand-checked UCD Belfield → Trinity College route, a real
   one-way street, and the Irish Sea snapping failure.
+
+## Stage 2 — Dynamic delivery instances (2026-08-16)
+
+- `dlm.instance.schema`: `Stop`/`Depot`/`Instance` models; `Instance.n_stops`
+  is a property, never a stored constant, per the project's dynamic-`N`
+  requirement.
+- `dlm.instance.builder.InstanceBuilder`: mutable builder with
+  `set_depot_from_*`/`add_stop_from_*` (address / lat-lon / preset /
+  seeded-random), `move_stop`/`remove_stop`/`rename_stop`, save/load, and
+  `build()` — the single point where business-rule validation (depot set,
+  `1 <= N <= 50`, no depot/stop node collision) runs, raising every problem
+  found at once.
+- `dlm.instance.geocode`: cached Nominatim geocoding (curl-based, per
+  ADR-0002's pattern) with ambiguity detection — returns candidates
+  instead of guessing when a query matches multiple genuinely distinct
+  real places.
+- ~30 curated, real, geocoded Dublin location presets
+  (`data/presets/dublin_locations.yaml`) spanning hospitals, universities,
+  retail, suburbs, transport hubs, and landmarks.
+- `dlm instance new/add/remove/move/rename/random/list/show/map` CLI, all
+  thin wrappers over `InstanceBuilder`.
+- `dlm.viz.folium_map`: `dlm instance map` renders a standalone Folium HTML
+  map of an instance's depot and stops.
+- Three canonical instances committed: `small` (N=8), `medium` (N=20),
+  `large` (N=40), built entirely from named Dublin locations (presets +
+  real addresses), not random points.
+- ADR-0003: expanded `DEFAULT_BBOX` to Greater Dublin (several curated
+  presets — the airport, outer suburbs — fell outside Stage 1's original,
+  smaller area); this in turn forced the graph cache format to change from
+  `.graphml` to pickle, since the larger graph missed Stage 1's <5s
+  cache-load bar under graphml (10.42s vs. pickle's 0.44-1.3s). Both
+  recorded as amendments in `docs/stages/stage-02-instances.md`, not made
+  silently.
+- 21 new tests (8 offline, 13 real-network-marked): the full N=1/2/3/8/20/40
+  sweep, add→remove→add content-equality, lossless save/load round-trip,
+  address/preset/lat-lon resolving to the same node, Irish Sea failure,
+  ambiguous-address candidates, and canonical-instance validation.
+- `experiments/render_map_screenshot.py`: a curl-relay workaround (same
+  pattern as ADR-0002, one layer up) for this sandbox's headless-browser
+  networking, used once to produce the committed
+  `docs/report/instance_map_small.png` acceptance-evidence screenshot.
