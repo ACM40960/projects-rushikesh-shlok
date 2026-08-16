@@ -1,0 +1,33 @@
+# Default free-flow speeds (km/h) by OSM `highway` tag, used to impute
+# travel time on edges that have no usable OSM `maxspeed` tag.
+#
+# Basis: Irish default speed limits (Road Traffic Act 2004 / Road Safety
+# Authority default limits: 50 km/h "urban"/build-up areas, 80 km/h
+# regional/local roads outside urban areas, 100 km/h national roads,
+# 120 km/h motorways), adjusted downward for road classes where the
+# statutory default limit is rarely the realistic free-flow speed (e.g.
+# `service`, `living_street`, `track`). See docs/data.md for the full
+# citation and discussion.
+#
+# Units: km/h. `travel_time.py` converts to m/s before computing
+# travel_time = length_m / speed_m_s.
+#
+# `default` is used for any `highway` value not listed here.
+
+motorway: 120
+motorway_link: 80
+trunk: 100
+trunk_link: 60
+primary: 80
+primary_link: 50
+secondary: 80
+secondary_link: 50
+tertiary: 60
+tertiary_link: 50
+unclassified: 50
+residential: 50
+living_street: 20
+service: 20
+track: 30
+road: 50
+default: 50

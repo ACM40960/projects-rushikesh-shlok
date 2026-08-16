@@ -67,7 +67,7 @@ docs/             architecture, modelling, data provenance, ADRs, one doc per st
 | # | Stage | Status |
 |---|---|---|
 | 0 | Foundations | ✅ |
-| 1 | Dublin road network | ⬜ |
+| 1 | Dublin road network | ✅ |
 | 2 | Dynamic instances | ⬜ |
 | 3 | Travel-time matrix | ⬜ |
 | 4 | Baseline solver | ⬜ |

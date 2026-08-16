@@ -31,6 +31,9 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
+network_app = typer.Typer(help="Build and inspect the Dublin road network graph.")
+app.add_typer(network_app, name="network")
+
 
 def _version_callback(value: bool) -> None:
     if value:
@@ -50,6 +53,43 @@ def main(
 ) -> None:
     """Disruption-aware last-mile routing on Dublin's road network."""
     configure_logging()
+
+
+def _report_lines(report) -> list[str]:  # noqa: ANN001 - GraphBuildReport, avoid import at module load
+    stats = report.travel_time_stats
+    dropped_nodes = report.n_nodes_before_scc - report.n_nodes
+    dropped_edges = report.n_edges_before_scc - report.n_edges
+    return [
+        f"cache:            {report.cache_path} ({'hit' if report.from_cache else 'built fresh'})",
+        f"build time:       {report.build_seconds:.2f}s",
+        f"nodes:            {report.n_nodes} (dropped {dropped_nodes} outside largest strongly "
+        "connected component)",
+        f"edges:            {report.n_edges} (dropped {dropped_edges})",
+        f"maxspeed real:    {stats.n_real_maxspeed}/{stats.n_edges} ({stats.pct_real:.1f}%)",
+        f"maxspeed imputed: {stats.n_imputed}/{stats.n_edges}",
+    ]
+
+
+@network_app.command("build")
+def network_build(
+    force: bool = typer.Option(False, "--force", help="Ignore the cache and re-download."),
+) -> None:
+    """Download (or load from cache) the Dublin routable graph and report its stats."""
+    from dlm.network.loader import build_graph
+
+    _, report = build_graph(force_rebuild=force)
+    for line in _report_lines(report):
+        typer.echo(line)
+
+
+@network_app.command("stats")
+def network_stats() -> None:
+    """Print stats for the cached Dublin graph, building it first if needed."""
+    from dlm.network.loader import build_graph
+
+    _, report = build_graph()
+    for line in _report_lines(report):
+        typer.echo(line)
 
 
 if __name__ == "__main__":
