@@ -107,12 +107,131 @@ smarter neighbourhood search or the O(1) delta trick restricted to
 provably-symmetric sub-regions — out of scope for this project's
 Dublin-last-mile scale.
 
-## T1/T2/T3 (preview)
+## T2, T3, and the information model
 
-Only `T1` exists as of Stage 4. `T2` (the planned route's cost after a
-disruption), `T3` (the re-optimised route's cost), `T3_oracle`, and
-`Saving %` are Stage 6 additions, once a disruption (Stage 5) and a
-re-optimisation trigger exist to define them against. This section will be
-extended then with the full definitions, the information-model enum
-(`omniscient`/`reactive`/`infeasible`), and a worked numeric example, per
-the brief.
+`T1` is the planned route's cost under normal conditions. Once a
+disruption exists (Stage 5), "the same route's cost after the disruption"
+is not a single obvious number — it depends on **what the driver of the
+original planned route knows about the disruption, and when**:
+
+- **`omniscient`**: the driver knows about the disruption before setting
+  off, so every leg between two consecutive planned stops is driven along
+  whatever the *disrupted* graph's shortest path actually is — the stop
+  **order** never changes (that is `T3`'s job, not this), only the path
+  taken between stops can.
+- **`reactive`**: the driver only discovers a disruption by driving into
+  it. They follow the *original* leg's planned path node by node; an
+  edge that still exists (unaffected, or just a slow zone) is used at its
+  current cost; the moment an edge no longer exists, that is where the
+  disruption is *discovered*, and the driver detours from exactly that
+  point — not from the leg's start — to the leg's original destination.
+
+`T2` is computed under one of these (`dlm.simulation.execution
+.execute_solution`, `InformationModel`), and can turn out **infeasible**
+for either: no path exists from the discovery point to a leg's
+destination at all. This is a real, reportable outcome (Stage 5 measured
+that a full closure can and does disconnect parts of the real Dublin
+graph), not an error.
+
+```
+T2 = drive_time(same order, executed under `information_model`) + service_time
+```
+
+`T3` is the cost after **re-optimising** the not-yet-served stops from
+wherever a `reactive` execution first discovered a closure
+(`dlm.simulation.replan.replan_from_blockage`) — deliberately anchored to
+`reactive`, since re-optimisation is what a real dispatcher does the
+moment a driver reports being blocked, and there is nothing to react to
+under `omniscient` (it never "discovers" anything mid-route to trigger a
+replan from). If the reactive execution never hits a closure at all (a
+slow zone only, or a disruption that misses the route entirely), `T3`
+trivially equals the reactive `T2` — nothing to re-optimise around.
+
+```
+T3 = drive_time(served prefix, actual)
+   + drive_time(re-optimised order over the remaining stops, from the
+                blockage point, on the disrupted graph)
+   + drive_time(last remaining stop -> true depot)
+   + service_time
+Saving(%) = (T2 - T3) / T2 * 100
+```
+
+**Service time is identical across `T1`/`T2`/`T3`.** A disruption changes
+how long it takes to *drive between* stops; it never changes how long you
+spend *at* one (Stage 4's principle, unchanged here) — so
+`_total_service_time_s` is computed once and reused by all three, and
+only `drive_time_s` can differ between them.
+
+**`T3_oracle`** (`dlm.simulation.metrics.compute_t3_oracle`) is a fourth
+number, not part of the `Saving %` formula: a from-scratch re-solve of
+the *whole* instance (every stop, not just the not-yet-served ones)
+against the disrupted graph, as if the disruption had been known before
+ever leaving the depot — exactly `compute_t1`, run on `disrupted_graph`
+instead of the normal graph. It exists to ask "how much is lost by only
+reacting once actually blocked, versus knowing from the start," and in
+an *exact* solver it would always be `<= T3`. **It is not always `<= T3`
+here**, because both are solved with the same heuristic (`TwoOptSolver`):
+nearest-neighbour's greedy first choice is sensitive to the exact cost
+matrix, so a from-scratch solve on a slightly different (disrupted)
+matrix can land in a worse local optimum than 2-opt reaching from the
+*original* route's already-good order. This is a genuine measured
+outcome (see `docs/stages/stage-06-experiment.md`'s Results), reported
+honestly rather than forced to fit the "more information is always
+better" intuition that only strictly holds for an exact solver.
+
+**Why `T3`'s re-optimisation doesn't jointly plan for a cheap final
+return leg.** The remaining-stops sub-problem is solved as an ordinary
+closed tour starting and ending at the blockage node (reusing
+`TwoOptSolver` unchanged — no solver code needed to change for this
+stage), then one direct leg from the last stop visited to the true depot
+is appended. This does not jointly optimise for *which* stop should be
+last so that final leg is cheap — a documented simplification (see
+`docs/stages/stage-06-experiment.md`), not a silent one, chosen because
+it reuses Stage 4's solver with zero modification at the cost of a
+potentially-suboptimal final leg, which is simple enough to explain and
+correct enough at this project's scale (`N <= 50`).
+
+### Worked example
+
+A small hand-built graph (`tests/test_simulation.py`'s "diamond" fixture)
+makes every number checkable by hand:
+
+```
+      10        10        10
+  0 ------> 1 ------> 2 ------> 3
+             \                  ^
+              12                |
+               \                12
+                v               |
+                4 ---------------
+                 \--3--> 2   (shortcut back from 4 to 2)
+  3 ------> 0   (return leg, 20)
+```
+
+A single stop `A` sits at node 3. Under normal conditions the solver
+picks `0-1-2-3` (cost 30) over `0-1-4-3` (34) or `0-1-2-4-3` (35) — the
+direct path is genuinely fastest, so `T1 = 30 + 20 = 50` (+ service time).
+
+Close edge `2->3` (a single closure, nothing else):
+
+- **omniscient**: fresh shortest path `0->3` on the disrupted graph is
+  `0-1-4-3 = 34` — it never goes near node 2 at all. `T2(omniscient)`
+  drive time `= 34 + 20 = 54`.
+- **reactive**: drives `0-1-2 = 20`, discovers `2->3` is gone, detours
+  `2-4-3 = 3+12 = 15` from node 2. `T2(reactive)` drive time
+  `= 20 + 15 + 20 = 55` — one unit worse than omniscient, exactly the
+  cost of the "wasted" trip into node 2 before discovering the closure.
+- **T3**: replan triggers from node 2 (where the blockage was found);
+  with only one stop left to serve there is nothing to reorder, so `T3`
+  matches `T2(reactive)` exactly: drive time `55`, `Saving % = 0`.
+
+Now also close edge `2->4` (removing reactive's only detour): `reactive`
+gets stuck at node 2 with no way to node 3 at all — `T2(reactive)` and
+`T3` are both **infeasible** — while `omniscient` is entirely unaffected
+(`54`, unchanged), since it never routes through node 2 to begin with.
+This is the concrete case the `omniscient`/`reactive` distinction exists
+to capture, and it is verified exactly as stated in
+`tests/test_simulation.py::test_closing_the_only_detour_makes_reactive_and_replan_infeasible_but_not_omniscient`.
+
+Real-Dublin evidence for both the divergence and the infeasibility cases
+is in `docs/stages/stage-06-experiment.md`.

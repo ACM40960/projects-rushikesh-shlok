@@ -23,10 +23,15 @@ Terms are added as the stage that introduces them lands.
   (edge/node/corridor/polygon closure, or a slow zone), with optional time
   bounds and severity. A `Scenario` is a list of `Disruption`s. See
   `docs/stages/stage-05-disruptions.md`.
-- **Information model** — the enum (`omniscient` / `reactive` / `infeasible`)
-  describing what the driver of the *original* planned route knows about a
-  disruption and when, which is what makes `T2` well-defined. See
-  `docs/modelling.md`.
+- **Information model** — `dlm.simulation.execution.InformationModel`
+  (`omniscient` / `reactive`): what the driver of the *original* planned
+  route knows about a disruption and when, which is what makes `T2`
+  well-defined. `infeasible` (anticipated here as a third enum value
+  before Stage 6's implementation) turned out to read more naturally as a
+  separate `feasible: bool` outcome flag on `T2Result`/`T3Result` — a
+  route can be infeasible under *either* information model, so it isn't a
+  third kind of driver knowledge, just a possible outcome of the other
+  two. See `docs/modelling.md` and `docs/stages/stage-06-experiment.md`.
 - **T1 / T2 / T3 / T3_oracle / Saving %** — the core evaluation metrics; see
   the root `README.md` for the one-line definitions and `docs/modelling.md`
   for the precise ones.

@@ -193,3 +193,41 @@ One section per stage. Dates are UTC.
   up-front-resolution and closure-beats-slow-zone conflict rules) + 11
   network-marked (all four curated scenarios validate and apply cleanly,
   the disconnection finding, revert timing on the real graph).
+
+## Stage 6 — Experiment core: T1/T2/T3 (2026-08-16)
+
+- `dlm.simulation.execution`: `InformationModel` (`omniscient`/`reactive`)
+  and `execute_solution` drive a `Solution` over a disrupted graph edge by
+  edge — `omniscient` re-plans each leg fresh, `reactive` walks the
+  original path and only detours from the exact point a closure is
+  discovered. Either can be infeasible per leg (no path from the
+  discovery point onward) — a first-class, reported outcome.
+- `dlm.simulation.replan.replan_from_blockage`: re-optimises the
+  not-yet-served stops from wherever a `reactive` execution first hit a
+  closure (`TwoOptSolver`, unchanged), anchoring `T3` to a realistic
+  dispatcher-reacts-to-a-blocked-driver trigger, per the Stage 0
+  scaffolding's own description of `replan.py`'s job.
+- `dlm.simulation.metrics`: `compute_t2`/`compute_t3`/`compute_saving`,
+  plus `compute_t3_oracle` (a from-scratch full-route re-solve, the
+  `T3_oracle` the glossary anticipated) — all four share one
+  `_total_service_time_s` helper, since service time never depends on
+  routing.
+- `dlm compare --instance X --scenario Y` CLI: prints `T1`/`T2`
+  (omniscient + reactive)/`T3`/`T3_oracle`/`Saving %` and writes
+  `results/<instance>-vs-<scenario>-<timestamp>/`.
+- Real findings: `liffey_quays_closure` strands a `reactive` driver
+  (infeasible) that `omniscient` and a full `T3_oracle` replan both
+  recover from; `demo_single_edge_closure` (a new, narrow single-edge
+  scenario built to force a clean detour) measures `T3_oracle > T3` —
+  proof that "more information, re-solved from scratch" isn't a strict
+  guarantee once both sides share the same heuristic solver, reported
+  honestly rather than smoothed over.
+- Amendment to the glossary's anticipated design: `InformationModel` has
+  two values, not three — infeasibility is a `feasible: bool` outcome on
+  `T2Result`/`T3Result`, not a third kind of driver knowledge.
+- 17 new tests (113 total): 10 offline (a hand-built "diamond" graph with
+  a genuine alternate route, every number derived and cross-checked —
+  omniscient/reactive divergence, blockage detection, the promised
+  `T1==T2==T3` no-op regression test, `T3_oracle` mechanics) + 7
+  network-marked (all four curated scenarios end-to-end, the real
+  infeasibility/recovery finding above).

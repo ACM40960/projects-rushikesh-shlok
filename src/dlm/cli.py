@@ -501,6 +501,169 @@ def plan(
     typer.echo(f"written to:        {run_dir}")
 
 
+def _t2_line(label: str, t2) -> str:  # noqa: ANN001 - T2Result, avoid import at module load
+    if not t2.feasible:
+        return f"{label}: INFEASIBLE (a required leg has no path on the disrupted graph)"
+    return f"{label}: {t2.total_time_s:.1f}s (drive {t2.drive_time_s:.1f}s)"
+
+
+@app.command("compare")
+def compare(
+    instance: str = typer.Option(..., "--instance", help="Instance name."),
+    scenario: str = typer.Option(..., "--scenario", help="Scenario name (see `dlm disrupt list`)."),
+    solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+) -> None:
+    """Compute T1/T2/T3/Saving % for an instance under a disruption
+    scenario.
+
+    Writes `results/<instance>-vs-<scenario>-<timestamp>/` with
+    `config.yaml`, `result.json`, `route_map.html` (the T1 plan), and
+    `disruption_map.html` (what the scenario changed).
+    """
+    import json
+    from datetime import UTC, datetime
+
+    import yaml
+
+    from dlm.config import settings
+    from dlm.disruption.engine import apply_scenario
+    from dlm.disruption.schema import ScenarioNotFoundError, find_scenario, load_scenario
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.simulation.execution import InformationModel
+    from dlm.simulation.metrics import (
+        compute_saving,
+        compute_t1,
+        compute_t2,
+        compute_t3,
+        compute_t3_oracle,
+    )
+    from dlm.solver.nearest_neighbour import NearestNeighbourSolver
+    from dlm.solver.two_opt import TwoOptSolver
+    from dlm.viz.folium_map import save_disruption_map, save_route_map
+
+    inst_path = _instance_path(instance)
+    if not inst_path.exists():
+        typer.echo(f"No instance named {instance!r} (looked in {inst_path}).")
+        raise typer.Exit(code=1)
+    try:
+        scenario_path = find_scenario(scenario)
+    except ScenarioNotFoundError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+    sc = load_scenario(scenario_path)
+
+    graph, graph_report = build_graph()
+    builder = InstanceBuilder.load(graph, inst_path)
+    try:
+        inst = builder.build()
+    except Exception as exc:  # noqa: BLE001 - report validation problems, not a crash
+        typer.echo(f"Instance {instance!r} is not ready: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+    matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+    solvers = {"nn_2opt": TwoOptSolver(), "nearest_neighbour": NearestNeighbourSolver()}
+    if solver not in solvers:
+        typer.echo(f"Unknown solver {solver!r}. Choices: {', '.join(solvers)}")
+        raise typer.Exit(code=1)
+    solution = solvers[solver].solve(inst, matrix)
+    t1 = compute_t1(inst, solution)
+
+    disruption_result = apply_scenario(graph, sc)
+    t2_omniscient = compute_t2(inst, solution, disruption_result.graph, InformationModel.OMNISCIENT)
+    t2_reactive = compute_t2(inst, solution, disruption_result.graph, InformationModel.REACTIVE)
+    t3 = compute_t3(inst, solution, disruption_result.graph)
+    t3_oracle = compute_t3_oracle(inst, disruption_result.graph)
+    saving_pct = compute_saving(t2_reactive, t3)
+
+    run_id = f"{instance}-vs-{scenario}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    config = {
+        "instance": instance,
+        "scenario": scenario,
+        "solver": solver,
+        "seed": inst.seed,
+        "default_service_time_s": settings.default_service_time_s,
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    def _t2_json(t2):  # noqa: ANN001, ANN202
+        return {
+            "information_model": t2.information_model.value,
+            "feasible": t2.feasible,
+            "drive_time_s": t2.drive_time_s,
+            "total_time_s": t2.total_time_s,
+            "distance_m": t2.distance_m,
+        }
+
+    result = {
+        "run_id": run_id,
+        "instance": instance,
+        "scenario": scenario,
+        "T1": {"total_time_s": t1.total_time_s, "drive_time_s": t1.drive_time_s},
+        "T2_omniscient": _t2_json(t2_omniscient),
+        "T2_reactive": _t2_json(t2_reactive),
+        "T3": {
+            "triggered": t3.triggered,
+            "feasible": t3.feasible,
+            "drive_time_s": t3.drive_time_s,
+            "total_time_s": t3.total_time_s,
+            "distance_m": t3.distance_m,
+            "order": t3.order,
+        },
+        "T3_oracle": {
+            "feasible": t3_oracle.feasible,
+            "drive_time_s": t3_oracle.drive_time_s,
+            "total_time_s": t3_oracle.total_time_s,
+            "distance_m": t3_oracle.distance_m,
+            "order": t3_oracle.order,
+        },
+        "saving_pct": saving_pct,
+        "disruption": {
+            "n_edges_closed": disruption_result.n_edges_closed,
+            "n_edges_slowed": disruption_result.n_edges_slowed,
+        },
+    }
+    (run_dir / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+    save_route_map(inst, solution, graph, run_dir / "route_map.html")
+    save_disruption_map(disruption_result, run_dir / "disruption_map.html")
+
+    typer.echo(f"instance:          {instance}  scenario: {scenario}")
+    typer.echo(
+        f"edges closed/slowed: {disruption_result.n_edges_closed}/"
+        f"{disruption_result.n_edges_slowed}"
+    )
+    typer.echo(f"T1 (normal):       {t1.total_time_s:.1f}s")
+    typer.echo(_t2_line("T2 (omniscient)", t2_omniscient))
+    typer.echo(_t2_line("T2 (reactive)  ", t2_reactive))
+    if not t3.feasible:
+        typer.echo("T3 (re-optimised): INFEASIBLE")
+    else:
+        typer.echo(
+            f"T3 (re-optimised): {t3.total_time_s:.1f}s (drive {t3.drive_time_s:.1f}s, "
+            f"replan {'triggered' if t3.triggered else 'not needed'})"
+        )
+    if not t3_oracle.feasible:
+        typer.echo("T3_oracle (best possible): INFEASIBLE")
+    else:
+        typer.echo(f"T3_oracle (best possible): {t3_oracle.total_time_s:.1f}s")
+    if saving_pct is not None:
+        typer.echo(f"Saving %:          {saving_pct:.1f}%  (vs T2 reactive)")
+    elif t2_reactive.feasible and not t3.feasible:
+        typer.echo("Saving %:          n/a (T3 also infeasible)")
+    elif not t2_reactive.feasible and t3.feasible:
+        typer.echo(
+            "Saving %:          n/a (T2 infeasible, but re-optimising recovers a feasible route)"
+        )
+    typer.echo(f"written to:        {run_dir}")
+
+
 def _scenario_template(name: str, shape: object, effect: object) -> str:  # noqa: ANN001
     from dlm.disruption.schema import DisruptionEffect, DisruptionShape
 

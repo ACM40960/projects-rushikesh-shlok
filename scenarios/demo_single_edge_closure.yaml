@@ -1,0 +1,19 @@
+schema_version: 1
+name: demo_single_edge_closure
+description: >
+  Not a curated real-world event (see scenarios/library/ for those) — a
+  single, deliberately narrow edge closure partway along the `small`
+  canonical instance's depot -> s5 leg, used in
+  docs/stages/stage-06-experiment.md to demonstrate a *successful*
+  reactive detour and a triggered (but non-improving, single-remaining-
+  stop) T3 replan. The curated library's corridor/polygon closures are
+  each wide enough that the real Dublin evidence for a successful local
+  detour doesn't naturally occur among them (see that stage doc's Results
+  section) — this one is deliberately minimal so it does.
+disruptions:
+  - id: single_edge
+    shape: edge
+    effect: closure
+    description: One residential-street edge, closed both directions.
+    from_latlon: [53.3515563, -6.2255034]
+    to_latlon: [53.3512677, -6.2257209]
