@@ -265,3 +265,32 @@ One section per stage. Dates are UTC.
   `dlm.disruption.generators` (determinism, every shape x effect
   combination, real-graph resolution) + 6 for `dlm.viz.figures`
   (including infeasible-row and empty-distribution edge cases).
+
+## Stage 8 — Fleet & benchmark (2026-08-16)
+
+- `dlm.solver.clarke_wright.ClarkeWrightSolver`: parallel-savings CVRP
+  construction (`fleet_size` vehicles, `vehicle_capacity` respected) +
+  per-route 2-opt (Stage 4's `two_opt_improve`, reused unchanged). The
+  savings formula needs no asymmetric-graph adaptation, unlike 2-opt's
+  own classical delta trick.
+- `dlm.solver.ortools_solver.OrToolsSolver`: the fixed OR-Tools benchmark
+  oracle (ADR-0001) — one `RoutingModel` handles `fleet_size == 1` and
+  `> 1` alike, with an optional capacity dimension and, when stops carry
+  `time_window`s, VRPTW support the hand-implemented solvers don't
+  attempt (a documented scope boundary, not a gap to close).
+- `dlm.solver.base.FleetSolution`: multi-vehicle routes, reusing
+  `Solution`/`Leg` per vehicle; unfit stops land in `.unassigned`, never
+  silently dropped.
+- `dlm instance new --vehicle-capacity`, `dlm instance add --demand`;
+  `dlm plan` auto-detects `fleet_size > 1`; new `dlm benchmark` command.
+- New canonical instance `fleet` (K=3, capacity=10, 15 stops, demand
+  exactly matching total capacity).
+- Real finding: `dlm benchmark` measures OR-Tools beating the hand-
+  implemented solvers by 1.5% (`small`, K=1) and 1.8% (`fleet`, K=3) —
+  both hand-implemented solves complete in under a millisecond, OR-Tools
+  given an 8s budget finds a modestly better answer, the expected shape
+  of result for a fast heuristic vs. a real metaheuristic.
+- 11 new tests (146 total): 7 offline (a hand-built chain graph whose
+  savings values are hand-derivable, capacity/fleet-size interaction) +
+  4 network-marked (the canonical `fleet` instance, OR-Tools K=1/K>1
+  parity, the VRPTW drop-one-stop demonstration).

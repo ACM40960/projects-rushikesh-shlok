@@ -177,6 +177,7 @@ class InstanceBuilder:
         label: str | None = None,
         source: StopSource = StopSource.LATLON,
         max_dist_m: float = DEFAULT_MAX_SNAP_DIST_M,
+        demand: float = 0.0,
     ) -> MutationResult:
         snap = snap_to_node(self.graph, lat, lon, max_dist_m)
         stop = Stop(
@@ -186,6 +187,7 @@ class InstanceBuilder:
             lon=lon,
             node=snap.node,
             source=source,
+            demand=demand,
         )
         self.instance.stops.append(stop)
         self._warn_if_node_collision(stop.node, stop.id)
@@ -196,19 +198,21 @@ class InstanceBuilder:
             stop,
         )
 
-    def add_stop_from_address(self, address: str, label: str | None = None) -> MutationResult:
+    def add_stop_from_address(
+        self, address: str, label: str | None = None, demand: float = 0.0
+    ) -> MutationResult:
         geo = geocode(address)
         result = self.add_stop_from_latlon(
-            geo.lat, geo.lon, label=label or geo.label, source=StopSource.ADDRESS
+            geo.lat, geo.lon, label=label or geo.label, source=StopSource.ADDRESS, demand=demand
         )
         return MutationResult(
             "add_stop", f"Added stop from address {address!r}: {result.message}", result.stop
         )
 
-    def add_stop_from_preset(self, name: str) -> MutationResult:
+    def add_stop_from_preset(self, name: str, demand: float = 0.0) -> MutationResult:
         preset = get_preset(name)
         result = self.add_stop_from_latlon(
-            preset.lat, preset.lon, label=preset.name, source=StopSource.PRESET
+            preset.lat, preset.lon, label=preset.name, source=StopSource.PRESET, demand=demand
         )
         return MutationResult(
             "add_stop", f"Added stop from preset {name!r}: {result.message}", result.stop

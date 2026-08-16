@@ -1,0 +1,3 @@
+instance,n_stops,fleet_size,hand_solver,hand_total_time_s,hand_n_served,hand_runtime_s,ortools_total_time_s,ortools_n_served,ortools_runtime_s,ortools_status,gap_pct
+small,8,1,nn_2opt,1820.0117687687273,8,0.0006494522094726562,1793.401440399646,8,8.06686282157898,ok,1.4837909555348319
+fleet,15,3,clarke_wright_2opt,8856.162388763292,15,0.0007417201995849609,8695.892933792551,15,8.001594066619873,ok,1.8430477029900905

@@ -13,6 +13,8 @@ modules land:
 - Stage 5 adds ``dlm disrupt list`` / ``validate`` / ``preview`` / ``new``.
 - Stage 6 adds ``dlm compare``.
 - Stage 7 adds ``dlm batch``, ``dlm figures``, ``dlm sensitivity``.
+- Stage 8 adds ``dlm plan`` fleet support (``fleet_size > 1``) and
+  ``dlm benchmark``.
 
 This file intentionally has no domain logic — every command is a thin
 wrapper that parses arguments and calls into ``dlm.network`` / ``dlm.instance``
@@ -156,7 +158,10 @@ def instance_new(
     depot_latlon: str | None = typer.Option(None, "--depot-latlon", help="'lat,lon'"),
     depot_preset: str | None = typer.Option(None, "--depot-preset"),
     seed: int = typer.Option(42, "--seed"),
-    fleet_size: int = typer.Option(1, "--fleet-size", min=1),
+    fleet_size: int = typer.Option(1, "--fleet-size", min=1, help="Number of vehicles, K."),
+    vehicle_capacity: float | None = typer.Option(
+        None, "--vehicle-capacity", help="Per-vehicle demand capacity (unset = unlimited)."
+    ),
     force: bool = typer.Option(
         False, "--force", help="Overwrite an existing instance of this name."
     ),
@@ -179,7 +184,13 @@ def instance_new(
         raise typer.Exit(code=1)
 
     graph, _ = build_graph()
-    builder = InstanceBuilder(graph, name=name, seed=seed, fleet_size=fleet_size)
+    builder = InstanceBuilder(
+        graph,
+        name=name,
+        seed=seed,
+        fleet_size=fleet_size,
+        vehicle_capacity=vehicle_capacity,
+    )
     try:
         if depot_address is not None:
             result = builder.set_depot_from_address(depot_address)
@@ -207,6 +218,7 @@ def instance_add(
     latlon: str | None = typer.Option(None, "--latlon", help="'lat,lon'"),
     preset: str | None = typer.Option(None, "--preset"),
     label: str | None = typer.Option(None, "--label"),
+    demand: float = typer.Option(0.0, "--demand", help="Delivery demand at this stop (CVRP)."),
 ) -> None:
     """Add one stop by address, lat/lon, or preset. Exactly one is required."""
     from dlm.instance.geocode import GeocodeError
@@ -221,13 +233,13 @@ def instance_add(
     builder = _load_builder(name)
     try:
         if address is not None:
-            result = builder.add_stop_from_address(address, label=label)
+            result = builder.add_stop_from_address(address, label=label, demand=demand)
         elif latlon is not None:
             lat, lon = _parse_latlon(latlon)
-            result = builder.add_stop_from_latlon(lat, lon, label=label)
+            result = builder.add_stop_from_latlon(lat, lon, label=label, demand=demand)
         else:
             assert preset is not None
-            result = builder.add_stop_from_preset(preset)
+            result = builder.add_stop_from_preset(preset, demand=demand)
     except (SnapError, PresetNotFoundError) as exc:
         typer.echo(f"Error: {exc}")
         raise typer.Exit(code=1) from exc
@@ -406,12 +418,84 @@ def instance_matrix(
     typer.echo(f"triangle violations: {stats.triangle_violations}")
 
 
+def _plan_fleet(instance: str, inst, graph, graph_report, run_id: str, run_dir) -> None:  # noqa: ANN001 - avoid heavy imports at module load
+    import json
+
+    import yaml
+
+    from dlm.config import settings
+    from dlm.instance.matrix import build_matrix
+    from dlm.simulation.metrics import compute_fleet_t1
+    from dlm.solver.clarke_wright import ClarkeWrightSolver
+    from dlm.viz.folium_map import save_fleet_route_map
+
+    nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+    matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+    fleet = ClarkeWrightSolver().solve_fleet(inst, matrix)
+    t1 = compute_fleet_t1(inst, fleet)
+
+    config = {
+        "instance": instance,
+        "solver": "clarke_wright_2opt",
+        "fleet_size": inst.fleet_size,
+        "vehicle_capacity": inst.vehicle_capacity,
+        "seed": inst.seed,
+        "default_service_time_s": settings.default_service_time_s,
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    result = {
+        "run_id": run_id,
+        "instance": instance,
+        "n_vehicles_used": len(fleet.routes),
+        "unassigned": fleet.unassigned,
+        "T1": {
+            "drive_time_s": t1.drive_time_s,
+            "service_time_s": t1.service_time_s,
+            "total_time_s": t1.total_time_s,
+            "distance_m": t1.distance_m,
+            "n_stops_served": t1.n_stops_served,
+            "n_stops_unassigned": t1.n_stops_unassigned,
+        },
+        "routes": [
+            {"vehicle": i + 1, "order": s.order, "drive_time_s": s.total_time_s}
+            for i, s in enumerate(fleet.routes)
+        ],
+        "solver_meta": {k: v for k, v in fleet.meta.items()},
+    }
+    (run_dir / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+    save_fleet_route_map(inst, fleet, graph, run_dir / "route_map.html")
+
+    typer.echo("solver:            clarke_wright_2opt")
+    typer.echo(f"vehicles used:     {len(fleet.routes)} / {inst.fleet_size}")
+    for i, s in enumerate(fleet.routes, start=1):
+        typer.echo(f"  vehicle {i}: {' -> '.join(s.order)}  ({s.total_time_s:.1f}s)")
+    if fleet.unassigned:
+        typer.echo(f"UNASSIGNED:        {', '.join(fleet.unassigned)}")
+    typer.echo(f"drive time:        {t1.drive_time_s:.1f}s")
+    typer.echo(f"service time:      {t1.service_time_s:.1f}s ({t1.n_stops_served} stops)")
+    typer.echo(f"T1 (total time):   {t1.total_time_s:.1f}s")
+    typer.echo(f"distance:          {t1.distance_m:.1f}m")
+    typer.echo(f"written to:        {run_dir}")
+
+
 @app.command("plan")
 def plan(
     instance: str = typer.Option(..., "--instance", help="Instance name."),
-    solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+    solver: str = typer.Option(
+        "nn_2opt",
+        "--solver",
+        help="'nn_2opt' or 'nearest_neighbour' (fleet_size == 1 only — "
+        "fleet_size > 1 always uses Clarke-Wright + 2-opt).",
+    ),
 ) -> None:
     """Solve an instance's baseline route and report T1.
+
+    `fleet_size == 1` (the default): single route, `--solver` selects
+    `nn_2opt`/`nearest_neighbour`. `fleet_size > 1`: multiple vehicle
+    routes via Clarke-Wright + 2-opt (Stage 8) — `--solver` is ignored.
 
     Writes `results/<instance>-<timestamp>/` with `config.yaml`,
     `result.json`, and `route_map.html`.
@@ -443,6 +527,14 @@ def plan(
         typer.echo(f"Instance {instance!r} is not ready: {exc}")
         raise typer.Exit(code=1) from exc
 
+    run_id = f"{instance}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    if inst.fleet_size > 1:
+        _plan_fleet(instance, inst, graph, graph_report, run_id, run_dir)
+        return
+
     nodes = [inst.depot.node, *(s.node for s in inst.stops)]
     matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
 
@@ -452,10 +544,6 @@ def plan(
         raise typer.Exit(code=1)
     solution = solvers[solver].solve(inst, matrix)
     t1 = compute_t1(inst, solution)
-
-    run_id = f"{instance}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
-    run_dir = settings.results_dir / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
 
     config = {
         "instance": instance,
@@ -1153,6 +1241,130 @@ def sensitivity(
                 f"T1={row['total_time_s']:.1f}s "
                 f"(service time = {row['service_time_share_pct']:.1f}% of T1)"
             )
+    typer.echo(f"written to:        {run_dir}")
+    typer.echo(f"also written to:   {out_path}")
+
+
+@app.command("benchmark")
+def benchmark(
+    instances: str = typer.Option(
+        "small,medium,large,fleet", "--instances", help="Comma-separated instance names."
+    ),
+    time_limit_s: float = typer.Option(10.0, "--time-limit", help="OR-Tools search time budget."),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Also write the results CSV here (default docs/report/benchmark_results.csv).",
+    ),
+) -> None:
+    """Compare the hand-implemented solver (`nn_2opt` for `fleet_size ==
+    1`, `clarke_wright_2opt` for `fleet_size > 1`) against the OR-Tools
+    benchmark oracle: solution quality (`gap_pct`, positive = hand-
+    implemented costs more) and runtime, per instance.
+
+    Writes `results/benchmark-<timestamp>/` and a committed CSV
+    (`--out`, default `docs/report/benchmark_results.csv`).
+    """
+    import time
+    from datetime import UTC, datetime
+
+    import pandas as pd
+    import yaml
+
+    from dlm.config import REPO_ROOT, settings
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.solver.clarke_wright import ClarkeWrightSolver
+    from dlm.solver.ortools_solver import OrToolsSolutionNotFound, OrToolsSolver
+    from dlm.solver.two_opt import TwoOptSolver
+
+    instance_names = [s.strip() for s in instances.split(",") if s.strip()]
+    graph, graph_report = build_graph()
+
+    rows: list[dict] = []
+    for inst_name in instance_names:
+        path = _instance_path(inst_name)
+        if not path.exists():
+            typer.echo(f"Skipping unknown instance {inst_name!r} (looked in {path}).")
+            continue
+        inst = InstanceBuilder.load(graph, path).build()
+        nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+        matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+
+        if inst.fleet_size == 1:
+            t0 = time.time()
+            hand_solution = TwoOptSolver().solve(inst, matrix)
+            hand_runtime_s = time.time() - t0
+            hand_solver_name = "nn_2opt"
+            hand_total_s = hand_solution.total_time_s
+            hand_n_served = len(hand_solution.order)
+        else:
+            t0 = time.time()
+            hand_fleet = ClarkeWrightSolver().solve_fleet(inst, matrix)
+            hand_runtime_s = time.time() - t0
+            hand_solver_name = "clarke_wright_2opt"
+            hand_total_s = hand_fleet.total_time_s
+            hand_n_served = sum(len(r.order) for r in hand_fleet.routes)
+
+        t0 = time.time()
+        try:
+            or_fleet = OrToolsSolver(time_limit_s=time_limit_s).solve_fleet(
+                inst, matrix, apply_time_windows=False
+            )
+            or_runtime_s = time.time() - t0
+            or_total_s: float | None = or_fleet.total_time_s
+            or_n_served = sum(len(r.order) for r in or_fleet.routes)
+            or_status = "ok"
+        except OrToolsSolutionNotFound:
+            or_runtime_s = time.time() - t0
+            or_total_s = None
+            or_n_served = 0
+            or_status = "no_solution"
+
+        gap_pct = (
+            100.0 * (hand_total_s - or_total_s) / or_total_s
+            if or_total_s not in (None, 0)
+            else None
+        )
+        rows.append(
+            {
+                "instance": inst_name,
+                "n_stops": inst.n_stops,
+                "fleet_size": inst.fleet_size,
+                "hand_solver": hand_solver_name,
+                "hand_total_time_s": hand_total_s,
+                "hand_n_served": hand_n_served,
+                "hand_runtime_s": hand_runtime_s,
+                "ortools_total_time_s": or_total_s,
+                "ortools_n_served": or_n_served,
+                "ortools_runtime_s": or_runtime_s,
+                "ortools_status": or_status,
+                "gap_pct": gap_pct,
+            }
+        )
+        or_str = "n/a" if or_total_s is None else f"{or_total_s:.1f}s"
+        gap_str = "n/a" if gap_pct is None else f"{gap_pct:+.1f}%"
+        typer.echo(
+            f"{inst_name}: hand={hand_total_s:.1f}s ({hand_runtime_s * 1000:.1f}ms)  "
+            f"or-tools={or_str} ({or_runtime_s:.2f}s)  gap={gap_str}"
+        )
+
+    df = pd.DataFrame(rows)
+    run_id = f"benchmark-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(run_dir / "benchmark_results.csv", index=False)
+    config = {
+        "instances": instance_names,
+        "time_limit_s": time_limit_s,
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    out_path = Path(out) if out else REPO_ROOT / "docs" / "report" / "benchmark_results.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
     typer.echo(f"written to:        {run_dir}")
     typer.echo(f"also written to:   {out_path}")
 

@@ -235,3 +235,55 @@ to capture, and it is verified exactly as stated in
 
 Real-Dublin evidence for both the divergence and the infeasibility cases
 is in `docs/stages/stage-06-experiment.md`.
+
+## Multi-vehicle CVRP and the OR-Tools benchmark
+
+Everything above assumes a single vehicle (`K=1`). `instance.fleet_size`
+(`K`) and `instance.vehicle_capacity` have existed in the schema since
+Stage 2, unused until now: `fleet_size > 1` turns the problem into a
+**Capacitated Vehicle Routing Problem (CVRP)** — `K` vehicles, each
+starting and ending at the depot, jointly visiting every stop exactly
+once, with each vehicle's total picked-up `Stop.demand` never exceeding
+`vehicle_capacity`.
+
+**Clarke-Wright savings** (`dlm.solver.clarke_wright`) is the
+hand-implemented method: every stop starts on its own trivial round trip;
+routes are greedily merged in descending order of
+
+```
+savings(i, j) = cost(i, depot) + cost(depot, j) - cost(i, j)
+```
+
+— the driving time saved by joining the route ending at `i` directly to
+the route starting at `j`, instead of both returning to the depot and
+setting off again — skipping any merge that would exceed
+`vehicle_capacity`. Unlike Stage 4's 2-opt, this formula needs no
+adaptation for Dublin's directed, asymmetric graph: every term already
+uses its one natural direction. Each resulting route is then handed to
+the *same* `two_opt_improve` Stage 4 already built, unchanged — a single
+vehicle's route is exactly the single-vehicle TSP that function solves.
+
+**Fleet-size capping.** If capacity-respecting merging still leaves more
+routes than `K`, the largest (most-stops) routes are kept and the rest's
+stops are reported in `FleetSolution.unassigned` — maximising stops
+served given a fixed vehicle budget, honestly reporting what didn't fit
+rather than silently dropping it or violating capacity to force
+everything in.
+
+**OR-Tools (`dlm.solver.ortools_solver`) is the benchmark oracle**
+(ADR-0001), not a second primary method: one `RoutingModel` setup handles
+`K=1` and `K>1` alike (a capacity dimension when `vehicle_capacity` is
+set, a disjunction-with-penalty per stop so an infeasible instance drops
+the least-costly-to-drop stops instead of returning no solution at all),
+solved with guided local search under a time budget. `dlm benchmark`
+runs both solvers on the same instance and reports the gap.
+
+**Time windows are OR-Tools-only.** `Stop.time_window` has existed since
+Stage 2; a time-window-respecting 2-opt/Clarke-Wright would need to
+re-check every downstream stop's schedule after each candidate move —
+substantially more engineering than this project's hand-implemented v1
+scope justifies. OR-Tools solves VRPTW natively (one more dimension), so
+the benchmark oracle demonstrates it directly (`dlm.solver.ortools_solver
+.OrToolsSolver.solve_fleet(..., apply_time_windows=True)`) — exactly the
+kind of capability gap a benchmark exists to make visible, per
+`docs/stages/stage-08-fleet-benchmark.md`'s real evidence.

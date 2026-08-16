@@ -77,11 +77,43 @@ class Solution:
 
 
 class Solver(Protocol):
-    """Every solver takes an instance + its travel-time matrix and returns
-    a `Solution`. No solver needs the road graph directly — `Matrix`
-    already carries cost, path, and distance for every pair (Stage 3)."""
+    """Every single-vehicle solver takes an instance + its travel-time
+    matrix and returns a `Solution`. No solver needs the road graph
+    directly — `Matrix` already carries cost, path, and distance for
+    every pair (Stage 3)."""
 
     def solve(self, instance: Instance, matrix: Matrix) -> Solution: ...
+
+
+@dataclass(frozen=True)
+class FleetSolution:
+    """Multiple vehicles' routes over one instance — Stage 8's shape for
+    `instance.fleet_size > 1` (or a capacity-constrained `fleet_size ==
+    1`), returned by `ClarkeWrightSolver`/`OrToolsSolver.solve_fleet`.
+
+    Attributes
+    ----------
+    routes : list[Solution]
+        One `Solution` per vehicle actually used — never a padded list of
+        `instance.fleet_size` entries; an unused vehicle simply isn't
+        represented (`len(routes) <= instance.fleet_size`).
+    unassigned : list[str]
+        Stop ids that could not be assigned to any vehicle (not enough
+        vehicles/capacity to serve everyone) — a first-class infeasibility
+        signal, not a silently dropped stop.
+    total_time_s : float
+        Sum of every route's `total_time_s`.
+    total_distance_m : float
+        Sum of every route's `total_distance_m`.
+    meta : dict[str, Any]
+        Solver-specific bookkeeping, as `Solution.meta`.
+    """
+
+    routes: list[Solution]
+    unassigned: list[str]
+    total_time_s: float
+    total_distance_m: float
+    meta: dict[str, Any] = field(default_factory=dict)
 
 
 def _node_of(instance: Instance, stop_id: str) -> int:
@@ -131,6 +163,25 @@ def build_solution(
         legs=legs,
         total_time_s=sum(leg.travel_time_s for leg in legs),
         total_distance_m=sum(leg.distance_m for leg in legs),
+        meta=meta or {},
+    )
+
+
+def build_fleet_solution(
+    instance: Instance,
+    matrix: Matrix,
+    routes: list[list[str]],
+    unassigned: list[str] | None = None,
+    meta: dict[str, Any] | None = None,
+) -> FleetSolution:
+    """Expand a list of per-vehicle stop-id orders into a `FleetSolution`,
+    reusing `build_solution` unchanged for each individual route."""
+    solutions = [build_solution(instance, matrix, order) for order in routes]
+    return FleetSolution(
+        routes=solutions,
+        unassigned=list(unassigned or []),
+        total_time_s=sum(s.total_time_s for s in solutions),
+        total_distance_m=sum(s.total_distance_m for s in solutions),
         meta=meta or {},
     )
 

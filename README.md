@@ -74,7 +74,7 @@ docs/             architecture, modelling, data provenance, ADRs, one doc per st
 | 5 | Disruption engine | ✅ |
 | 6 | Experiment core (T1/T2/T3) | ✅ |
 | 7 | Results harness | ✅ |
-| 8 | Fleet & benchmark | ⬜ |
+| 8 | Fleet & benchmark | ✅ |
 | 9 | Hardening | ⬜ |
 | 10 | UI | ⬜ |
 

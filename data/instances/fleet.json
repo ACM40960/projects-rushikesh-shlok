@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "name": "fleet",
+  "depot": {
+    "id": "depot",
+    "label": "Dublin Port, Dublin Tunnel, Fairview, North Strand, North Dock B ED, Dublin, County Dublin, Leinster, D03 R8P8, Éire / Ireland",
+    "lat": 53.3527704,
+    "lon": -6.2245117,
+    "node": 26759862,
+    "demand": 0.0,
+    "service_time_s": 0.0,
+    "time_window": null,
+    "source": "address"
+  },
+  "stops": [
+    {
+      "id": "s1",
+      "label": "Grafton Street",
+      "lat": 53.3420874,
+      "lon": -6.2598865,
+      "node": 32236033,
+      "demand": 1.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s2",
+      "label": "Rathmines",
+      "lat": 53.3265199,
+      "lon": -6.2648571,
+      "node": 337429610,
+      "demand": 2.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s3",
+      "label": "Ranelagh",
+      "lat": 53.3252185,
+      "lon": -6.2550504,
+      "node": 665818,
+      "demand": 3.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s4",
+      "label": "Clontarf",
+      "lat": 53.3608138,
+      "lon": -6.1968538,
+      "node": 944018297,
+      "demand": 1.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s5",
+      "label": "Drumcondra",
+      "lat": 53.3680988,
+      "lon": -6.2554727,
+      "node": 28248042,
+      "demand": 2.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s6",
+      "label": "Phoenix Park",
+      "lat": 53.3599698,
+      "lon": -6.3259525,
+      "node": 11853415,
+      "demand": 3.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s7",
+      "label": "Dublin Castle",
+      "lat": 53.3426623,
+      "lon": -6.2670042,
+      "node": 3211234671,
+      "demand": 1.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s8",
+      "label": "Croke Park",
+      "lat": 53.3603576,
+      "lon": -6.2509812,
+      "node": 1540661083,
+      "demand": 2.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s9",
+      "label": "Ballsbridge",
+      "lat": 53.3291947,
+      "lon": -6.2313316,
+      "node": 32335093,
+      "demand": 3.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s10",
+      "label": "Dun Laoghaire",
+      "lat": 53.2922794,
+      "lon": -6.1360079,
+      "node": 662010,
+      "demand": 1.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s11",
+      "label": "Tallaght",
+      "lat": 53.2878082,
+      "lon": -6.362355,
+      "node": 4238246,
+      "demand": 2.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s12",
+      "label": "Swords",
+      "lat": 53.4581587,
+      "lon": -6.2105356,
+      "node": 317492476,
+      "demand": 3.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s13",
+      "label": "Blanchardstown Centre",
+      "lat": 53.3932751,
+      "lon": -6.3920415,
+      "node": 876378758,
+      "demand": 1.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s14",
+      "label": "Liffey Valley Shopping Centre",
+      "lat": 53.3550863,
+      "lon": -6.392476,
+      "node": 10069652226,
+      "demand": 2.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    },
+    {
+      "id": "s15",
+      "label": "Dundrum Town Centre",
+      "lat": 53.2870344,
+      "lon": -6.2421875,
+      "node": 243189071,
+      "demand": 3.0,
+      "service_time_s": 0.0,
+      "time_window": null,
+      "source": "preset"
+    }
+  ],
+  "fleet_size": 3,
+  "vehicle_capacity": 10.0,
+  "seed": 42,
+  "created_at": "2026-08-16T15:41:41.208083Z"
+}

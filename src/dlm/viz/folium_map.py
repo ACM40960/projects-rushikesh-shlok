@@ -4,7 +4,8 @@ Stage 2 introduces :func:`render_instance_map` (``dlm instance map``) so
 stop selection is visually checkable before any UI exists. Stage 4 adds
 :func:`render_route_map` (``dlm plan``), drawing the solved route's actual
 street-following geometry. Stage 5 adds :func:`render_disruption_map`
-(``dlm disrupt preview``). Before/after comparison layers land in Stage 6.
+(``dlm disrupt preview``). Stage 8 adds :func:`render_fleet_route_map`
+(``dlm plan`` for ``fleet_size > 1``), one colour per vehicle.
 """
 
 from __future__ import annotations
@@ -16,13 +17,16 @@ import networkx as nx
 
 from dlm.disruption.engine import DisruptionResult
 from dlm.instance.schema import Instance
-from dlm.solver.base import Solution
+from dlm.solver.base import FleetSolution, Solution
 
 _DEPOT_COLOR = "black"
 _STOP_COLOR = "blue"
 _ROUTE_COLOR = "#2c7fb8"
 _CLOSED_COLOR = "#d7191c"
 _SLOWED_COLOR = "#fd8d3c"
+_FLEET_COLORS = ["#e41a1c", "#377eb8", "#4daf4a", "#984ea3", "#ff7f00", "#a65628", "#f781bf"]
+"""Colorbrewer Set1 (colourblind-checked qualitative palette), cycled if
+`fleet_size` exceeds its length."""
 _DUBLIN_CENTRE = (53.3498, -6.2603)
 
 
@@ -139,6 +143,84 @@ def save_route_map(
     """Render and save a route map as a standalone HTML file."""
     path.parent.mkdir(parents=True, exist_ok=True)
     m = render_route_map(instance, solution, graph)
+    m.save(str(path))
+    return path
+
+
+def render_fleet_route_map(
+    instance: Instance, fleet: FleetSolution, graph: nx.MultiDiGraph
+) -> folium.Map:
+    """Render every vehicle's route in its own colour, plus any
+    unassigned stops (Stage 8's `FleetSolution.unassigned`) marked
+    distinctly rather than silently omitted.
+    """
+    if instance.depot is None:
+        raise ValueError(
+            f"Instance {instance.name!r} has no depot set — cannot render a fleet route map."
+        )
+
+    m = folium.Map(location=[instance.depot.lat, instance.depot.lon], zoom_start=12)
+    stops_by_id = {s.id: s for s in instance.stops}
+
+    for vehicle_idx, solution in enumerate(fleet.routes):
+        color = _FLEET_COLORS[vehicle_idx % len(_FLEET_COLORS)]
+        for leg in solution.legs:
+            coords = [(graph.nodes[n]["y"], graph.nodes[n]["x"]) for n in leg.path]
+            folium.PolyLine(
+                coords,
+                color=color,
+                weight=4,
+                opacity=0.85,
+                tooltip=(
+                    f"vehicle {vehicle_idx + 1}: {leg.from_id} -> {leg.to_id} "
+                    f"({leg.travel_time_s:.0f}s, {leg.distance_m:.0f}m)"
+                ),
+            ).add_to(m)
+        for visit_number, stop_id in enumerate(solution.order, start=1):
+            stop = stops_by_id[stop_id]
+            folium.CircleMarker(
+                location=[stop.lat, stop.lon],
+                radius=8,
+                color=color,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
+                popup=(
+                    f"vehicle {vehicle_idx + 1}, stop {visit_number}: {stop.id} {stop.label} "
+                    f"(demand {stop.demand:g})"
+                ),
+                tooltip=f"V{vehicle_idx + 1}.{visit_number} {stop.label}",
+            ).add_to(m)
+
+    for stop_id in fleet.unassigned:
+        stop = stops_by_id[stop_id]
+        folium.Marker(
+            location=[stop.lat, stop.lon],
+            popup=f"UNASSIGNED: {stop.id} {stop.label} (demand {stop.demand:g})",
+            tooltip=f"UNASSIGNED: {stop.label}",
+            icon=folium.Icon(color="gray", icon="remove"),
+        ).add_to(m)
+
+    folium.Marker(
+        location=[instance.depot.lat, instance.depot.lon],
+        popup=f"Depot: {instance.depot.label} (node {instance.depot.node})",
+        tooltip=f"Depot: {instance.depot.label}",
+        icon=folium.Icon(color=_DEPOT_COLOR, icon="home"),
+    ).add_to(m)
+
+    all_lats = [instance.depot.lat, *(s.lat for s in stops_by_id.values())]
+    all_lons = [instance.depot.lon, *(s.lon for s in stops_by_id.values())]
+    m.fit_bounds([[min(all_lats), min(all_lons)], [max(all_lats), max(all_lons)]])
+
+    return m
+
+
+def save_fleet_route_map(
+    instance: Instance, fleet: FleetSolution, graph: nx.MultiDiGraph, path: Path
+) -> Path:
+    """Render and save a fleet route map as a standalone HTML file."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    m = render_fleet_route_map(instance, fleet, graph)
     m.save(str(path))
     return path
 

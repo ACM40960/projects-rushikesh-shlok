@@ -30,7 +30,7 @@ from dlm.instance.matrix import DEFAULT_WEIGHT, _build
 from dlm.instance.schema import Instance
 from dlm.simulation.execution import InformationModel, execute_solution
 from dlm.simulation.replan import _strongly_connected_together, replan_from_blockage
-from dlm.solver.base import Solution, Solver
+from dlm.solver.base import FleetSolution, Solution, Solver
 from dlm.solver.two_opt import TwoOptSolver
 
 
@@ -131,6 +131,53 @@ def compute_t1(
             )
             for leg in solution.legs
         ],
+    )
+
+
+@dataclass(frozen=True)
+class FleetT1Result:
+    """`T1` for a `FleetSolution` (Stage 8, `fleet_size > 1`): every
+    vehicle's own `T1Result`, plus fleet-wide totals.
+
+    Attributes
+    ----------
+    per_vehicle : list[T1Result]
+        One `T1Result` per vehicle actually used — `compute_t1` applied
+        unchanged to each vehicle's own `Solution`.
+    n_stops_unassigned : int
+        Stops no vehicle could serve (`FleetSolution.unassigned`) — not
+        counted in any total below; a fleet-wide `T1` that silently
+        ignored them would understate the instance's real cost.
+    """
+
+    drive_time_s: float
+    service_time_s: float
+    total_time_s: float
+    distance_m: float
+    n_stops_served: int
+    n_stops_unassigned: int
+    per_vehicle: list[T1Result] = field(default_factory=list)
+
+
+def compute_fleet_t1(
+    instance: Instance,
+    fleet: FleetSolution,
+    default_service_time_s: float | None = None,
+) -> FleetT1Result:
+    """Compute `T1` for a multi-vehicle `FleetSolution` — sums each
+    vehicle's own `compute_t1` (each vehicle's `Solution.order` only ever
+    contains that vehicle's stops, so there's no double-counting)."""
+    per_vehicle = [compute_t1(instance, s, default_service_time_s) for s in fleet.routes]
+    drive_time_s = sum(t1.drive_time_s for t1 in per_vehicle)
+    service_time_s = sum(t1.service_time_s for t1 in per_vehicle)
+    return FleetT1Result(
+        drive_time_s=drive_time_s,
+        service_time_s=service_time_s,
+        total_time_s=drive_time_s + service_time_s,
+        distance_m=sum(t1.distance_m for t1 in per_vehicle),
+        n_stops_served=sum(t1.n_stops_served for t1 in per_vehicle),
+        n_stops_unassigned=len(fleet.unassigned),
+        per_vehicle=per_vehicle,
     )
 
 
@@ -347,11 +394,13 @@ def compute_saving(t2: T2Result, t3: T3Result) -> float | None:
 
 
 __all__ = [
+    "FleetT1Result",
     "LegMetric",
     "T1Result",
     "T2Result",
     "T3OracleResult",
     "T3Result",
+    "compute_fleet_t1",
     "compute_saving",
     "compute_t1",
     "compute_t2",
