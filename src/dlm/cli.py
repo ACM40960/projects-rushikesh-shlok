@@ -403,5 +403,100 @@ def instance_matrix(
     typer.echo(f"triangle violations: {stats.triangle_violations}")
 
 
+@app.command("plan")
+def plan(
+    instance: str = typer.Option(..., "--instance", help="Instance name."),
+    solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+) -> None:
+    """Solve an instance's baseline route and report T1.
+
+    Writes `results/<instance>-<timestamp>/` with `config.yaml`,
+    `result.json`, and `route_map.html`.
+    """
+    import json
+    from datetime import UTC, datetime
+
+    import yaml
+
+    from dlm.config import settings
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.simulation.metrics import compute_t1
+    from dlm.solver.nearest_neighbour import NearestNeighbourSolver
+    from dlm.solver.two_opt import TwoOptSolver
+    from dlm.viz.folium_map import save_route_map
+
+    path = _instance_path(instance)
+    if not path.exists():
+        typer.echo(f"No instance named {instance!r} (looked in {path}).")
+        raise typer.Exit(code=1)
+
+    graph, graph_report = build_graph()
+    builder = InstanceBuilder.load(graph, path)
+    try:
+        inst = builder.build()
+    except Exception as exc:  # noqa: BLE001 - report validation problems, not a crash
+        typer.echo(f"Instance {instance!r} is not ready: {exc}")
+        raise typer.Exit(code=1) from exc
+
+    nodes = [inst.depot.node, *(s.node for s in inst.stops)]
+    matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+
+    solvers = {"nn_2opt": TwoOptSolver(), "nearest_neighbour": NearestNeighbourSolver()}
+    if solver not in solvers:
+        typer.echo(f"Unknown solver {solver!r}. Choices: {', '.join(solvers)}")
+        raise typer.Exit(code=1)
+    solution = solvers[solver].solve(inst, matrix)
+    t1 = compute_t1(inst, solution)
+
+    run_id = f"{instance}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = settings.results_dir / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    config = {
+        "instance": instance,
+        "solver": solver,
+        "seed": inst.seed,
+        "default_service_time_s": settings.default_service_time_s,
+        "graph_cache_key": graph_report.cache_path.stem,
+    }
+    (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+    result = {
+        "run_id": run_id,
+        "instance": instance,
+        "order": solution.order,
+        "T1": {
+            "drive_time_s": t1.drive_time_s,
+            "service_time_s": t1.service_time_s,
+            "total_time_s": t1.total_time_s,
+            "distance_m": t1.distance_m,
+            "n_stops_served": t1.n_stops_served,
+        },
+        "legs": [
+            {
+                "from": leg.from_id,
+                "to": leg.to_id,
+                "travel_time_s": leg.travel_time_s,
+                "distance_m": leg.distance_m,
+            }
+            for leg in t1.legs
+        ],
+        "solver_meta": {k: v for k, v in solution.meta.items() if k != "two_opt_trajectory"},
+    }
+    (run_dir / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+    save_route_map(inst, solution, graph, run_dir / "route_map.html")
+
+    typer.echo(f"solver:            {solver}")
+    typer.echo(f"order:             {' -> '.join(solution.order)}")
+    typer.echo(f"drive time:        {t1.drive_time_s:.1f}s")
+    typer.echo(f"service time:      {t1.service_time_s:.1f}s ({t1.n_stops_served} stops)")
+    typer.echo(f"T1 (total time):   {t1.total_time_s:.1f}s")
+    typer.echo(f"distance:          {t1.distance_m:.1f}m")
+    typer.echo(f"written to:        {run_dir}")
+
+
 if __name__ == "__main__":
     app()

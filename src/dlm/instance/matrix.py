@@ -1,8 +1,9 @@
 """Cached, incrementally-updatable travel-time + path matrix.
 
-Gives O(1) lookup of both the cost and the full node-sequence path between
-any two points of an instance (depot + stops), built with one Dijkstra per
-point (not one per *pair* — an N-point matrix costs N Dijkstras, not N^2).
+Gives O(1) lookup of the cost, the full node-sequence path, and the
+distance between any two points of an instance (depot + stops), built
+with one Dijkstra per point (not one per *pair* — an N-point matrix costs
+N Dijkstras, not N^2).
 
 Adding one point to an existing matrix costs exactly two more Dijkstras
 (one each direction, since the graph is directed) — not a full rebuild.
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WEIGHT = "travel_time"
 _TRIANGLE_INEQUALITY_TOLERANCE_S = 1e-6
+_MATRIX_SCHEMA_VERSION = 2  # bump to invalidate stale caches on a schema change
 
 
 @dataclass
@@ -78,16 +80,24 @@ class Matrix:
     weight : str
         The edge attribute Dijkstra minimises — `"travel_time"` by default.
     cost : dict[tuple[int, int], float]
-        `cost[(u, v)]` is the shortest travel time from `u` to `v`, seconds.
+        `cost[(u, v)]` is the shortest travel time from `u` to `v`, seconds
+        (i.e. the path Dijkstra found *minimising* travel time).
     paths : dict[tuple[int, int], list[int]]
         `paths[(u, v)]` is the full node sequence from `u` to `v`
         (inclusive of both endpoints).
+    distance : dict[tuple[int, int], float]
+        `distance[(u, v)]` is the metres travelled along that same
+        shortest (by time) path — not an independent shortest-by-distance
+        computation. Stored alongside `cost`/`paths` (rather than requiring
+        solvers to also hold a graph reference) so `Solver.solve(instance,
+        matrix)` is self-contained, per the brief's protocol.
     """
 
     nodes: list[int] = field(default_factory=list)
     weight: str = DEFAULT_WEIGHT
     cost: dict[tuple[int, int], float] = field(default_factory=dict)
     paths: dict[tuple[int, int], list[int]] = field(default_factory=dict)
+    distance: dict[tuple[int, int], float] = field(default_factory=dict)
 
     def get_cost(self, u: int, v: int) -> float:
         """Shortest travel time from `u` to `v`, in seconds."""
@@ -96,6 +106,10 @@ class Matrix:
     def get_path(self, u: int, v: int) -> list[int]:
         """Full node sequence of the shortest path from `u` to `v`."""
         return self.paths[(u, v)]
+
+    def get_distance(self, u: int, v: int) -> float:
+        """Metres travelled along the shortest (by time) path from `u` to `v`."""
+        return self.distance[(u, v)]
 
     def add_point(self, graph: nx.MultiDiGraph, node: int) -> None:
         """Add one point, costing exactly two Dijkstras (one per direction)
@@ -111,11 +125,16 @@ class Matrix:
         for other in self.nodes:
             self.cost[(node, other)] = dist_out[other]
             self.paths[(node, other)] = paths_out[other]
+            self.distance[(node, other)] = _path_distance_m(graph, paths_out[other])
+
+            path_in = list(reversed(paths_in_rev[other]))
             self.cost[(other, node)] = dist_in[other]
-            self.paths[(other, node)] = list(reversed(paths_in_rev[other]))
+            self.paths[(other, node)] = path_in
+            self.distance[(other, node)] = _path_distance_m(graph, path_in)
 
         self.cost[(node, node)] = 0.0
         self.paths[(node, node)] = [node]
+        self.distance[(node, node)] = 0.0
         self.nodes.append(node)
 
     def remove_point(self, node: int) -> None:
@@ -126,6 +145,8 @@ class Matrix:
             self.cost.pop((other, node), None)
             self.paths.pop((node, other), None)
             self.paths.pop((other, node), None)
+            self.distance.pop((node, other), None)
+            self.distance.pop((other, node), None)
 
     def move_point(self, graph: nx.MultiDiGraph, old_node: int, new_node: int) -> None:
         """Equivalent to `remove_point(old_node)` then `add_point(new_node)`."""
@@ -155,6 +176,23 @@ class Matrix:
     def load(cls, path: Path) -> Matrix:
         with path.open("rb") as f:
             return pickle.load(f)  # noqa: S301 - our own cache, never untrusted input
+
+
+def _path_distance_m(graph: nx.MultiDiGraph, path: list[int]) -> float:
+    """Sum edge length (metres) along a node path.
+
+    The graph is a `MultiDiGraph`: parallel edges between the same two
+    nodes are possible. For each step, the edge Dijkstra would have
+    actually used is the one with minimum `weight` (not necessarily
+    minimum length) — so that edge's length is what's summed here, rather
+    than an independent (and potentially inconsistent) minimum-length edge.
+    """
+    total = 0.0
+    for u, v in zip(path[:-1], path[1:], strict=True):
+        parallel_edges = graph.get_edge_data(u, v)
+        chosen = min(parallel_edges.values(), key=lambda d: d.get("travel_time", float("inf")))
+        total += chosen["length"]
+    return total
 
 
 def _build(graph: nx.MultiDiGraph, nodes: list[int], weight: str) -> Matrix:
@@ -205,7 +243,7 @@ def _compute_stats(m: Matrix, build_seconds: float, from_cache: bool) -> MatrixS
 
 
 def _cache_path(graph_id: str, nodes: list[int], weight: str) -> Path:
-    payload = f"{graph_id}|{sorted(nodes)}|{weight}"
+    payload = f"v{_MATRIX_SCHEMA_VERSION}|{graph_id}|{sorted(nodes)}|{weight}"
     key = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
     return settings.cache_dir / "matrix" / f"{key}.pkl"
 

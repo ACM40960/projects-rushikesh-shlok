@@ -48,6 +48,13 @@ class Settings(BaseSettings):
         an explicit seed; this is only the default when the caller omits one.
     log_level : str
         Python logging level name, e.g. ``INFO``, ``DEBUG``.
+    default_service_time_s : float
+        Fallback time spent at a stop (seconds) when a `Stop`'s own
+        `service_time_s` is unset (0.0 — the schema's default since Stage 2,
+        since no per-stop value has been set anywhere yet). Used from
+        Stage 4 onward to compute `T1`. 180s (3 minutes) is a placeholder
+        assumption pending author confirmation — see the ADR proposal in
+        docs/stages/stage-04-baseline.md.
     """
 
     model_config = SettingsConfigDict(
@@ -66,6 +73,7 @@ class Settings(BaseSettings):
 
     seed: int = Field(default=42)
     log_level: str = Field(default="INFO")
+    default_service_time_s: float = Field(default=180.0)
 
     def ensure_dirs(self) -> None:
         """Create all configured directories if they do not already exist."""

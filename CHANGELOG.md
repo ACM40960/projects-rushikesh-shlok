@@ -121,3 +121,36 @@ One section per stage. Dates are UTC.
   vs. full-rebuild equality and speedup (both fixture and real graph),
   save/load round-trip, and the N=20 build-time/cache-instant acceptance
   criteria.
+
+## Stage 4 — Baseline solver and T1 (2026-08-16)
+
+- `dlm.solver.base`: `Solution`/`Leg`/`Solver` protocol, shared by every
+  solver including the future OR-Tools benchmark (Stage 8).
+- `dlm.solver.nearest_neighbour.NearestNeighbourSolver`: greedy
+  construction using the matrix's directed cost (asymmetry-aware).
+- `dlm.solver.two_opt.TwoOptSolver`: 2-opt improvement with full directed
+  route-cost re-evaluation per candidate move — not the O(1) symmetric
+  delta trick, which is unsound given Stage 3's >95% asymmetry rate.
+  First-improvement, capped at 2000 iterations, logs its trajectory.
+- `dlm.simulation.metrics.compute_t1`: `T1` = driving time + per-stop
+  service time (falling back to `settings.default_service_time_s = 180.0`,
+  a placeholder flagged in ADR-0004 pending author confirmation), with a
+  full per-leg breakdown.
+- `dlm.viz.folium_map.render_route_map`: draws the solved route's actual
+  street-following geometry (real node paths, not straight lines).
+- `dlm plan --instance X` CLI: writes a self-describing
+  `results/<instance>-<timestamp>/{config.yaml, result.json, route_map.html}`.
+- Amendment to Stage 3: `Matrix` gained a `distance` field (metres along
+  the shortest-*time* path), since the brief's `Solver.solve(instance,
+  matrix)` protocol has no graph parameter for solvers to compute distance
+  independently; matrix cache key bumped to invalidate old caches missing
+  the field.
+- Real numbers: `small` (N=8) T1 = 3278.1s (1838.1s drive + 1440.0s
+  service, 21,961m); `medium` (N=20) T1 = 10,366.8s, 2-opt improved the
+  route 6.8% over nearest-neighbour alone; `large` (N=40) T1 = 19,019.3s,
+  2-opt improved it 1.6%. All three solve in under 100ms.
+- 15 new tests (66 total): a known optimum on the Stage 3 fixture graph
+  (verified by exhaustively checking all 6 permutations, not just
+  asserted), monotone 2-opt trajectories, degenerate sizes (N=0/1/2),
+  N=8/20/40 on the real canonical instances, T1 breakdown consistency, and
+  re-run determinism.
