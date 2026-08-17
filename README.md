@@ -3,87 +3,109 @@
 UCD ACM40960 — Projects in Mathematical Modelling.
 Authors: Shlok Shetty, Rushikesh Mane.
 
-## What this is
+## What this project does, in plain terms
 
-A fleet of `K` vehicles leaves a depot in Dublin, visits `N` delivery stops
-**chosen by the user at runtime** (address, lat/lon, curated preset, or a
-seeded random sample), and returns to the depot. A route is planned on the
-real Dublin street network (OpenStreetMap via OSMnx). The user can then
-simulate a disruption — a closed street, a parade, a protest, roadworks —
-and the system computes three numbers:
+Imagine a delivery van leaving a depot in Dublin with a list of stops to
+make. This project plans that route on Dublin's real streets (not a made-up
+grid), then asks a simple question: **what happens if a street on that route
+gets closed after the van has already left?**
 
-| Symbol | Meaning |
+The user picks the stops (by address, map coordinates, a preset location,
+or a random sample), and can then simulate a disruption — a closed road, a
+parade, roadworks, a protest. The system then compares three numbers:
+
+| Symbol | In plain terms |
 |---|---|
-| `T1` | Cost of the planned route under normal conditions |
-| `T2` | Cost of *the same planned route* after the disruption |
-| `T3` | Cost of the *re-optimised* route after the disruption |
+| `T1` | How long the original plan takes, if nothing goes wrong |
+| `T2` | How long that *same, unchanged* plan takes once the road is closed (the driver has to detour) |
+| `T3` | How long a *freshly re-planned* route takes instead, starting from wherever the driver got blocked |
 
 ```
 Saving(%) = (T2 - T3) / T2 × 100
 ```
 
-The project is not a research paper — it is the software that produces the
-evidence for one. See `docs/modelling.md` (from Stage 4 onward) for the
-precise definitions, and `docs/architecture.md` for how the pieces fit
-together.
+In other words: **does it actually pay off to re-plan on the fly, or is
+sticking with the original route just as good?** That is the question this
+project answers with real, measured numbers — not a guess.
 
-## Stack
+This is software that produces evidence, not a paper making a claim. For
+the exact definitions behind `T1`/`T2`/`T3`, see `docs/modelling.md`. For
+how the pieces of code fit together, see `docs/architecture.md`.
 
-Python 3.11+, OSMnx + NetworkX for the routable graph and path finding,
-hand-implemented Nearest-Neighbour + 2-opt as the primary solver (OR-Tools
-as a benchmark oracle from Stage 8), Streamlit + Folium for the UI (built
-last, Stage 10, as a thin client over an already-correct CLI pipeline).
+## What it's built with
 
-## Quickstart
+- **Python 3.11+**
+- **OSMnx + NetworkX** — download Dublin's real street map from
+  OpenStreetMap and find shortest paths on it
+- **A hand-written route solver** (Nearest-Neighbour + 2-opt — two classic,
+  simple route-planning techniques) as the main method, with **OR-Tools**
+  (a professional-grade solver library) used only to double-check how close
+  the hand-written one gets to a much stronger benchmark
+- **Streamlit + Folium** for the web app (a thin visual layer built last,
+  on top of a pipeline that already worked from the command line)
+
+## Try it yourself
 
 ```bash
 git clone <repo-url>
 cd Maths-Modelling
-make setup   # creates .venv, installs the package + dev/ui/fleet extras, installs pre-commit
-make test    # runs the test suite
+make setup   # creates a virtual environment, installs everything needed
+make test    # runs the automated test suite
 ```
 
-The full pipeline now runs end-to-end via:
+Once set up:
 
 ```bash
-make reproduce   # regenerates every number and figure in the report (~10 min, warm cache)
-make app         # launches the Streamlit UI
+make reproduce   # regenerates every number and chart used in the report (~10 min)
+make app         # opens the interactive web app in your browser
 ```
 
-## Repository layout
+## How the code is organised
 
 ```
-src/dlm/          the pipeline: network, instance, solver, disruption, simulation, viz, cli
-app/              Streamlit UI (Stage 10) — thin client only, no domain logic
-scenarios/        version-controlled disruption YAML files
-data/             cached graphs/matrices (gitignored) + committed presets and instances
-results/          per-run outputs (gitignored except this directory's README)
-tests/            pytest suite, including fixtures with known-optimal answers
-docs/             architecture, modelling, data provenance, ADRs, one doc per stage
+src/dlm/          the actual pipeline: map, delivery instances, solver,
+                   disruptions, simulation, charts, command-line tool
+app/              the web app (Stage 10) — just a visual front end,
+                   no logic of its own
+scenarios/        saved disruption examples (as readable YAML files)
+data/             cached maps/matrices (not stored in git) + example
+                   delivery instances that are stored in git
+results/          output from each run (not stored in git)
+tests/            automated tests, including some with hand-checked
+                   "known correct" answers
+docs/             write-ups: how it's built, the maths behind it, where
+                   the map data comes from, one document per project stage
 ```
 
-## Stage status
+## Project stages — all complete
 
-| # | Stage | Status |
+This project was built in eleven stages, each one working end-to-end
+before the next began:
+
+| # | Stage | What it added |
 |---|---|---|
-| 0 | Foundations | ✅ |
-| 1 | Dublin road network | ✅ |
-| 2 | Dynamic instances | ✅ |
-| 3 | Travel-time matrix | ✅ |
-| 4 | Baseline solver | ✅ |
-| 5 | Disruption engine | ✅ |
-| 6 | Experiment core (T1/T2/T3) | ✅ |
-| 7 | Results harness | ✅ |
-| 8 | Fleet & benchmark | ✅ |
-| 9 | Hardening | ✅ |
-| 10 | UI | ✅ |
+| 0 | Foundations | Project setup, tooling, tests |
+| 1 | Dublin road network | Downloads and prepares the real street map |
+| 2 | Dynamic instances | Lets a user choose delivery stops |
+| 3 | Travel-time matrix | Pre-computes travel time between every pair of stops |
+| 4 | Baseline solver | Plans a route (the "before disruption" plan) |
+| 5 | Disruption engine | Lets a user simulate a closed road, parade, etc. |
+| 6 | Experiment core | Computes `T1` / `T2` / `T3` and the saving |
+| 7 | Results harness | Runs many scenarios and produces charts |
+| 8 | Fleet & benchmark | Supports multiple vehicles; checks against OR-Tools |
+| 9 | Hardening | Tidies up, documents known limitations, checks reproducibility |
+| 10 | UI | The Streamlit web app |
 
-See `docs/stages/` for one write-up per completed stage (goal, design,
-interfaces, acceptance evidence, limitations).
+Each stage has its own write-up in `docs/stages/` — what it set out to do,
+how it was built, how it was checked, and what its known limitations are.
 
-## Documentation map
+## Where to read more
 
-Start at `docs/index.md`. Key documents: `docs/architecture.md` (data flow),
-`docs/modelling.md` (the maths), `docs/data.md` (OSM provenance and
-licensing), `docs/cli.md` (full command reference), `docs/limitations.md`,
-`docs/glossary.md`, `docs/adr/` (decision records).
+Start at `docs/index.md`. From there:
+`docs/architecture.md` (how the code fits together — the technical picture),
+`docs/modelling.md` (the maths, explained), `docs/data.md` (where the map
+data comes from and its licence), `docs/cli.md` (every command the tool
+supports), `docs/limitations.md` (what this project honestly does *not*
+model), `docs/glossary.md` (plain-English definitions of the routing/maths
+terms used throughout), `docs/adr/` (the reasoning behind key design
+decisions).
