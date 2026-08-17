@@ -20,6 +20,13 @@ htmlcov/
 data/cache/*
 !data/cache/.gitkeep
 
+# Exception: the exact Dublin drive-network snapshot the demo_saving scenario
+# was engineered against (see data/instances/README.md). OSM changes over time,
+# and a fresh fetch shifts this delicately-balanced result away from its
+# measured 7.4% saving; pinning this one cache file makes the demo
+# bit-reproducible on any machine instead of chasing live map data.
+!data/cache/dublin_drive_664cee449591eb29.pkl
+
 # Results (per-run outputs; regenerable via `make experiment`)
 results/*
 !results/README.md
