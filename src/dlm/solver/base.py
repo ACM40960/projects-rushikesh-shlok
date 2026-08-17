@@ -189,6 +189,19 @@ def build_fleet_solution(
 def route_time_s(instance: Instance, matrix: Matrix, order: list[str]) -> float:
     """Total driving time for `depot -> order -> depot`, without
     constructing a full `Solution` — the inner-loop cost function 2-opt
-    evaluates many times per improvement pass."""
+    evaluates many times per improvement pass.
+
+    Accumulates with a plain loop rather than the builtin `sum()`: Python
+    3.12 changed `sum()` to use compensated summation for floats, which
+    shifts this total by ~1e-10 versus 3.11. 2-opt's `candidate_cost <
+    best_cost` check is exactly the kind of near-tied comparison that
+    flips on a difference that small, sending the search down a different
+    sequence of accepted moves on 3.12+ than on 3.11 for the *same*
+    instance and matrix. A manual loop's left-to-right float addition is
+    stable across Python versions, so the search is reproducible.
+    """
     full_nodes = [_node_of(instance, stop_id) for stop_id in (DEPOT_ID, *order, DEPOT_ID)]
-    return sum(matrix.get_cost(u, v) for u, v in zip(full_nodes[:-1], full_nodes[1:], strict=True))
+    total = 0.0
+    for u, v in zip(full_nodes[:-1], full_nodes[1:], strict=True):
+        total += matrix.get_cost(u, v)
+    return total

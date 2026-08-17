@@ -55,6 +55,19 @@ was discovered. See the cited stage doc for full context on any item.
 - No lateness penalty or time windows in the hand-implemented solver
   (VRPTW support exists only via the OR-Tools benchmark oracle, Stage 8 —
   a deliberate scope boundary, not a gap).
+- 2-opt's first-improvement search is a greedy local search over
+  candidate route costs, so it is inherently sensitive to how those costs
+  are summed: `route_time_s` (the function behind every `candidate_cost <
+  best_cost` comparison) now accumulates with an explicit loop rather
+  than the builtin `sum()`, because Python 3.12 changed `sum()` to use
+  compensated summation for floats — a ~1e-10 difference from Python
+  3.11's naive summation. That is far below any measurement that matters,
+  but it is exactly the kind of gap a near-tied comparison can flip,
+  sending the search down a different sequence of accepted moves (and
+  landing in a different, not-necessarily-worse local optimum) depending
+  on which Python version ran it. Fixed at the source rather than worked
+  around, since it would otherwise silently affect any result
+  regenerated on Python 3.12+.
 
 ## Disruptions (Stage 5)
 
