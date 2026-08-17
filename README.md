@@ -32,7 +32,7 @@ This is software that produces evidence, not a paper making a claim. For
 the exact definitions behind `T1`/`T2`/`T3`, see `docs/modelling.md`. For
 how the pieces of code fit together, see `docs/architecture.md`.
 
-## What it's built with
+## Tools
 
 - **Python 3.11+**
 - **OSMnx + NetworkX** — download Dublin's real street map from
@@ -98,14 +98,3 @@ before the next began:
 
 Each stage has its own write-up in `docs/stages/` — what it set out to do,
 how it was built, how it was checked, and what its known limitations are.
-
-## Where to read more
-
-Start at `docs/index.md`. From there:
-`docs/architecture.md` (how the code fits together — the technical picture),
-`docs/modelling.md` (the maths, explained), `docs/data.md` (where the map
-data comes from and its licence), `docs/cli.md` (every command the tool
-supports), `docs/limitations.md` (what this project honestly does *not*
-model), `docs/glossary.md` (plain-English definitions of the routing/maths
-terms used throughout), `docs/adr/` (the reasoning behind key design
-decisions).
