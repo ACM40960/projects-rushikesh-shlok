@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/ACM40960/projects-rushikesh-shlok/actions/workflows/ci.yml/badge.svg)](https://github.com/ACM40960/projects-rushikesh-shlok/actions/workflows/ci.yml)
 
-Shlok Shetty and Rushikesh Mane
+Shlok Shetty (25206591) and Rushikesh Mane (25218847)
 ACM40960 — Projects in Mathematics Modelling, University College Dublin
 
 ## Overview
@@ -244,6 +244,7 @@ The repository history records the following work:
 
 ## Licence
 
-A software licence will be added only after both authors confirm the choice.
-The OpenStreetMap-derived graph remains subject to the ODbL terms described in
-[DATA_NOTICE.md](DATA_NOTICE.md), independently of any future software licence.
+The software is released under the [MIT License](LICENSE). The
+OpenStreetMap-derived graph remains subject to the ODbL terms described in
+[DATA_NOTICE.md](DATA_NOTICE.md); the MIT License does not replace those data
+licence terms.
