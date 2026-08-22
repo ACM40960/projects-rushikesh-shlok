@@ -1,6 +1,6 @@
 # Pinned lockfile, regenerated via:
 #   pip install -e ".[dev,ui,fleet]" && pip freeze | grep -v '^-e ' | grep -v '^dlm=='
-# Python 3.11. Do not hand-edit; regenerate and commit as a unit.
+# Tested snapshot for Python 3.11/3.12. Do not hand-edit; regenerate as a unit.
 
 absl-py==2.5.0
 altair==6.2.2
@@ -18,7 +18,6 @@ contourpy==1.3.3
 coverage==7.15.4
 cycler==0.12.1
 distlib==0.4.3
--e git+https://github.com/manerushikesh/Maths-Modelling@1b31546c9ff130d8f7f78533c1db59a849c138e4#egg=dlm
 filelock==3.32.3
 folium==0.20.0
 fonttools==4.63.0

@@ -45,9 +45,10 @@ app:
 reproduce:
 	$(VENV)/bin/dlm network build
 	$(VENV)/bin/dlm batch
-	$(VENV)/bin/dlm figures
 	$(VENV)/bin/dlm sensitivity
 	$(VENV)/bin/dlm benchmark
+	$(VENV)/bin/dlm stress-test
+	$(VENV)/bin/dlm figures
 
 clean:
 	rm -rf $(VENV) .pytest_cache .ruff_cache **/__pycache__

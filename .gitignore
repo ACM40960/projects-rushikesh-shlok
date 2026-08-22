@@ -26,6 +26,7 @@ data/cache/*
 # measured 7.4% saving; pinning this one cache file makes the demo
 # bit-reproducible on any machine instead of chasing live map data.
 !data/cache/dublin_drive_664cee449591eb29.pkl
+!data/cache/dublin_drive_664cee449591eb29.pkl.sha256
 
 # Results (per-run outputs; regenerable via `make experiment`)
 results/*
