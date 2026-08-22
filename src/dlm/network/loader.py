@@ -9,10 +9,10 @@ instead of re-downloading.
 
 The cache is pickle, not OSMnx's usual ``.graphml``: this graph (Greater
 Dublin, tens of thousands of nodes) took >10s to parse from XML on second
-load, well past the <5s target, while pickle — a fine choice for a purely
-internal, gitignored cache with no interchange requirement — loads the
-same graph in well under a second. See docs/stages/stage-01-network.md
-for the measured numbers.
+load, well past the <5s target, while pickle loads the same graph in well
+under a second. The committed reproducibility snapshot has an adjacent
+SHA-256 sidecar that is checked before deserialisation; arbitrary user-
+supplied pickle files are never accepted. See docs/data.md.
 
 The actual HTTP fetch is done with ``curl`` via subprocess rather than
 OSMnx's own ``requests``-based transport — see the note on
@@ -24,6 +24,7 @@ public API.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import pickle
 import subprocess
@@ -71,9 +72,10 @@ class GraphBuildReport:
     ----------
     n_nodes, n_edges : int
         Node/edge counts of the final graph (after largest-SCC extraction).
-    n_nodes_before_scc, n_edges_before_scc : int
+    n_nodes_before_scc, n_edges_before_scc : int, optional
         Counts before extracting the largest strongly connected component,
-        so the amount discarded is visible.
+        so the amount discarded is visible. ``None`` for an older cache that
+        predates the build-metadata sidecar.
     travel_time_stats : TravelTimeStats
         Coverage of real vs. imputed speeds.
     cache_path : Path
@@ -86,8 +88,8 @@ class GraphBuildReport:
 
     n_nodes: int
     n_edges: int
-    n_nodes_before_scc: int
-    n_edges_before_scc: int
+    n_nodes_before_scc: int | None
+    n_edges_before_scc: int | None
     travel_time_stats: TravelTimeStats
     cache_path: Path
     from_cache: bool
@@ -103,6 +105,36 @@ def _cache_key(bbox: tuple[float, float, float, float], network_type: str, simpl
 def _cache_path(bbox: tuple[float, float, float, float], network_type: str, simplify: bool) -> Path:
     key = _cache_key(bbox, network_type, simplify)
     return settings.cache_dir / f"dublin_{network_type}_{key}.pkl"
+
+
+def _sha256_path(path: Path) -> Path:
+    return path.with_suffix(f"{path.suffix}.sha256")
+
+
+def _metadata_path(path: Path) -> Path:
+    return path.with_suffix(f"{path.suffix}.metadata.json")
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _verify_cache_checksum(path: Path) -> None:
+    """Verify a repository-provided pickle before deserialising it."""
+    checksum_path = _sha256_path(path)
+    if not checksum_path.exists():
+        logger.warning("no SHA-256 sidecar for graph cache %s; treating it as a local cache", path)
+        return
+    expected = checksum_path.read_text(encoding="utf-8").split()[0].lower()
+    actual = _file_sha256(path)
+    if actual != expected:
+        raise ValueError(
+            f"graph cache checksum mismatch for {path}: expected {expected}, got {actual}"
+        )
 
 
 def _build_overpass_query(bbox: tuple[float, float, float, float], network_type: str) -> str:
@@ -229,8 +261,13 @@ def build_graph(
     t0 = time.time()
 
     if cache_path.exists() and not force_rebuild:
+        _verify_cache_checksum(cache_path)
         with cache_path.open("rb") as f:
             G = pickle.load(f)  # noqa: S301 - our own cache, never untrusted input
+        metadata_path = _metadata_path(cache_path)
+        metadata = (
+            json.loads(metadata_path.read_text(encoding="utf-8")) if metadata_path.exists() else {}
+        )
         stats = TravelTimeStats(
             n_edges=G.number_of_edges(),
             n_real_maxspeed=sum(
@@ -243,8 +280,8 @@ def build_graph(
         report = GraphBuildReport(
             n_nodes=G.number_of_nodes(),
             n_edges=G.number_of_edges(),
-            n_nodes_before_scc=G.number_of_nodes(),
-            n_edges_before_scc=G.number_of_edges(),
+            n_nodes_before_scc=metadata.get("n_nodes_before_scc"),
+            n_edges_before_scc=metadata.get("n_edges_before_scc"),
             travel_time_stats=stats,
             cache_path=cache_path,
             from_cache=True,
@@ -261,6 +298,22 @@ def build_graph(
 
     with cache_path.open("wb") as f:
         pickle.dump(G, f, protocol=pickle.HIGHEST_PROTOCOL)
+    checksum = _file_sha256(cache_path)
+    _sha256_path(cache_path).write_text(f"{checksum}  {cache_path.name}\n", encoding="utf-8")
+    _metadata_path(cache_path).write_text(
+        json.dumps(
+            {
+                "n_nodes_before_scc": n_nodes_before,
+                "n_edges_before_scc": n_edges_before,
+                "n_nodes": G.number_of_nodes(),
+                "n_edges": G.number_of_edges(),
+                "sha256": checksum,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     report = GraphBuildReport(
         n_nodes=G.number_of_nodes(),

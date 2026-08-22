@@ -141,6 +141,27 @@ def test_capacity_respected_with_more_vehicles_available() -> None:
         assert len(route.order) <= 2
 
 
+def test_ortools_preserves_fractional_demands_and_capacity() -> None:
+    """0.4-unit demands must not be rounded to zero by OR-Tools."""
+    pytest.importorskip("ortools")
+    from dlm.solver.ortools_solver import OrToolsSolver
+
+    instance, matrix = _chain_instance(demand=0.4, vehicle_capacity=0.8, fleet_size=1)
+    fleet = OrToolsSolver(time_limit_s=0.2).solve_fleet(instance, matrix, apply_time_windows=False)
+    served = [stop_id for route in fleet.routes for stop_id in route.order]
+    assert len(served) == 2
+    assert len(fleet.unassigned) == 2
+    assert len(served) * 0.4 <= instance.vehicle_capacity
+    assert fleet.meta["capacity_scale"] == 10
+
+
+def test_ortools_rejects_non_positive_time_limit() -> None:
+    from dlm.solver.ortools_solver import OrToolsSolver
+
+    with pytest.raises(ValueError, match="greater than zero"):
+        OrToolsSolver(time_limit_s=0)
+
+
 def test_solver_records_two_opt_activity_in_meta() -> None:
     instance, matrix = _chain_instance(fleet_size=1)
     fleet = ClarkeWrightSolver().solve_fleet(instance, matrix)

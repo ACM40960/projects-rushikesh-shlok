@@ -63,14 +63,11 @@ zone only, or a scenario that misses the route), `T3` is a no-op —
 also what makes `T1 == T2 == T3` under a no-op disruption a meaningful
 regression test rather than a special case in the code.
 
-**`T3`'s remaining-stops sub-problem reuses `TwoOptSolver` completely
-unchanged.** The blockage node becomes a temporary depot for a closed-tour
-solve over just the not-yet-served stops; one direct leg from the last
-stop visited to the *true* depot is appended afterwards. This does not
-jointly optimise for a cheap final return leg — a documented
-simplification (see Known limitations), chosen because it needed zero
-changes to Stage 4's solver, at the cost of occasionally not finding the
-truly best placement for the last stop before heading home. Feasibility
+**`T3` uses a path-specific 2-opt objective.** The blockage node is the
+fixed start, the real depot is the fixed endpoint, and only the not-yet-
+served stops are reordered. The evaluated cost is therefore `blockage ->
+remaining stops -> real depot`; the return home is jointly included rather
+than appended after optimising a different closed tour. Feasibility
 (can the blockage node, the depot, and every remaining stop all reach
 each other?) is checked with a single strongly-connected-components pass
 over the disrupted graph — the same idea Stage 5's own connectivity
@@ -91,10 +88,10 @@ route's already-good order. The `small` instance under
 reported as a genuine finding about heuristic re-optimisation, not
 smoothed into a false "more information is always better" claim.
 
-**Service time is identical across `T1`/`T2`/`T3`/`T3_oracle`.** A
-disruption changes driving time between stops, never time spent at one
-(Stage 4's principle, unchanged) — one shared `_total_service_time_s`
-helper, reused by all four.
+**Service time depends on which stops were actually served.** For feasible
+routes that complete the same deliveries it is identical across the metrics.
+If T2 becomes infeasible, only completed deliveries are charged service time;
+the failed leg and all later legs cannot be treated as completed work.
 
 **Amendment to the glossary's anticipated design.** `docs/glossary.md`
 (Stage 0) anticipated a three-valued `InformationModel` enum
@@ -113,14 +110,12 @@ earlier stages.
   `T3_oracle` now is. Rejected as the definition of `T3` itself because
   the pre-committed `replan.py` scaffolding specifically describes a
   blockage-triggered, current-position re-optimisation; keeping both
-  gives a realistic operating mode (`T3`) *and* an upper-bound comparison
-  (`T3_oracle`) instead of only one.
-- **A dummy zero-cost "return to start" edge trick** to let `TwoOptSolver`
-  jointly optimise the sub-problem's final leg to the true depot in one
-  solve. Rejected for the simpler "solve, then append one direct leg"
-  approach — the dummy-cost version is not guaranteed to actually place
-  the depot last either (2-opt is a heuristic), so it trades one
-  documented simplification for a less obviously correct one.
+  gives a realistic operating mode (`T3`) and a separate full-knowledge
+  heuristic comparison (`T3_oracle`) instead of only one. Neither is a
+  guaranteed bound because both are heuristic.
+- **A closed tour back to the blockage point.** This was the original
+  simplification, but it optimised the wrong endpoint. It was replaced by
+  the explicit fixed-start/fixed-end path objective.
 
 ## Interfaces
 
@@ -251,7 +246,7 @@ T1 (normal):       3260.0s
 T2 (omniscient): 3420.5s (drive 1980.5s)
 T2 (reactive)  : INFEASIBLE (a required leg has no path on the disrupted graph)
 T3 (re-optimised): INFEASIBLE
-T3_oracle (best possible): 3280.3s
+T3 full-knowledge heuristic: 3280.3s
 written to:        results/small-vs-liffey_quays_closure-<timestamp>/
 ```
 

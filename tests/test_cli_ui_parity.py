@@ -25,6 +25,22 @@ from dlm.cli import app as cli_app
 runner = CliRunner()
 
 
+def test_adjusted_scenario_changes_only_slow_zone_factor() -> None:
+    original_name = "luas_works_dawson_street"
+    adjusted = ui_state.scenario_with_speed_factor(original_name, 0.7)
+    assert adjusted.name == f"{original_name}_adjusted"
+    assert ui_state.scenario_has_slow_zone(original_name) is True
+    slow_zones = [d for d in adjusted.disruptions if d.effect.value == "slow_zone"]
+    assert slow_zones
+    assert all(d.speed_factor == pytest.approx(0.7) for d in slow_zones)
+
+
+@pytest.mark.parametrize("factor", [0.0, 1.0, -0.1])
+def test_adjusted_scenario_rejects_invalid_speed_factor(factor: float) -> None:
+    with pytest.raises(ValueError, match="strictly between"):
+        ui_state.scenario_with_speed_factor("luas_works_dawson_street", factor)
+
+
 def _result_json_from_output(stdout: str) -> dict:
     match = re.search(r"written to:\s*(\S+)", stdout)
     assert match, f"could not find 'written to:' in CLI output:\n{stdout}"

@@ -64,10 +64,22 @@ class Stop(BaseModel):
     lat: float = Field(ge=-90, le=90)
     lon: float = Field(ge=-180, le=180)
     node: int
-    demand: float = 0.0
-    service_time_s: float = 0.0
+    demand: float = Field(default=0.0, ge=0.0)
+    service_time_s: float = Field(default=0.0, ge=0.0)
     time_window: tuple[float, float] | None = None
     source: StopSource
+
+    @field_validator("time_window")
+    @classmethod
+    def _valid_time_window(cls, value: tuple[float, float] | None) -> tuple[float, float] | None:
+        if value is None:
+            return value
+        start, end = value
+        if start < 0 or end < 0:
+            raise ValueError("time-window bounds must be non-negative")
+        if end < start:
+            raise ValueError("time-window end must be greater than or equal to its start")
+        return value
 
 
 class Depot(Stop):
@@ -105,7 +117,7 @@ class Instance(BaseModel):
     depot: Depot | None = None
     stops: list[Stop] = Field(default_factory=list)
     fleet_size: int = Field(default=1, ge=1)
-    vehicle_capacity: float | None = None
+    vehicle_capacity: float | None = Field(default=None, gt=0.0)
     seed: int = 42
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -28,7 +28,7 @@ from dlm.instance.matrix import DEFAULT_WEIGHT, _build, _path_distance_m
 from dlm.instance.schema import Depot, Instance, StopSource
 from dlm.simulation.execution import ExecutionResult
 from dlm.solver.base import Solution, Solver
-from dlm.solver.two_opt import TwoOptSolver
+from dlm.solver.two_opt import two_opt_path_improve
 
 
 @dataclass(frozen=True)
@@ -85,12 +85,10 @@ def replan_from_blockage(
     """Re-optimise the not-yet-served stops from wherever
     `execution_result`'s reactive run first discovered a closure.
 
-    The re-optimised sub-problem is solved as an ordinary closed tour
-    starting and ending at the blockage node (reusing `TwoOptSolver`
-    unchanged), then one final leg from the last stop visited to the true
-    depot is appended directly — the sub-problem does not jointly optimise
-    for a cheap final return leg (a documented simplification, not a
-    silent one; see `docs/stages/stage-06-experiment.md`).
+    The re-optimised sub-problem has the fixed endpoints that the vehicle
+    really has: ``blockage -> remaining stops -> real depot``. Its 2-opt
+    objective therefore includes the final return to the real depot rather
+    than incorrectly closing a tour back at the blockage point.
     """
     blockage = execution_result.first_blockage
     if blockage is None:
@@ -118,10 +116,10 @@ def replan_from_blockage(
             triggered=True, feasible=False, drive_time_s=None, distance_m=None, order=[]
         )
 
-    solver = solver or TwoOptSolver()
-
     if remaining_stops:
-        sub_points = [blockage.node, *(s.node for s in remaining_stops)]
+        sub_points = list(
+            dict.fromkeys([blockage.node, instance.depot.node, *(s.node for s in remaining_stops)])
+        )
         sub_matrix = _build(disrupted_graph, sub_points, DEFAULT_WEIGHT)
         sub_depot = Depot(
             id="_replan_start",
@@ -134,33 +132,51 @@ def replan_from_blockage(
         sub_instance = Instance(
             name=f"{instance.name}-replan", depot=sub_depot, stops=remaining_stops
         )
-        sub_solution = solver.solve(sub_instance, sub_matrix)
+        if solver is None:
+            from dlm.solver.nearest_neighbour import _construct_order
 
-        visiting_time = sum(leg.travel_time_s for leg in sub_solution.legs[:-1])
-        visiting_dist = sum(leg.distance_m for leg in sub_solution.legs[:-1])
-        last_node = stops_by_id[sub_solution.order[-1]].node
-        final_order = served_order + sub_solution.order
-    else:
-        visiting_time = 0.0
-        visiting_dist = 0.0
-        last_node = blockage.node
-        final_order = served_order
+            initial_order = _construct_order(sub_instance, sub_matrix)
+        else:
+            # A caller-supplied solver still provides the initial ordering;
+            # the path-specific 2-opt pass corrects its endpoint objective.
+            initial_order = solver.solve(sub_instance, sub_matrix).order
 
-    return_path = nx.shortest_path(
-        disrupted_graph, last_node, instance.depot.node, weight="travel_time"
-    )
-    return_time_s = 0.0
-    for u, v in zip(return_path[:-1], return_path[1:], strict=True):
-        return_time_s += min(disrupted_graph[u][v].values(), key=lambda d: d["travel_time"])[
-            "travel_time"
+        replanned_order, _ = two_opt_path_improve(
+            blockage.node,
+            instance.depot.node,
+            sub_instance,
+            sub_matrix,
+            initial_order,
+        )
+        node_by_stop = {stop.id: stop.node for stop in remaining_stops}
+        route_nodes = [
+            blockage.node,
+            *(node_by_stop[stop_id] for stop_id in replanned_order),
+            instance.depot.node,
         ]
-    return_dist_m = _path_distance_m(disrupted_graph, return_path)
+        remaining_time = 0.0
+        remaining_dist = 0.0
+        for u, v in zip(route_nodes[:-1], route_nodes[1:], strict=True):
+            remaining_time += sub_matrix.get_cost(u, v)
+            remaining_dist += sub_matrix.get_distance(u, v)
+        final_order = served_order + replanned_order
+    else:
+        return_path = nx.shortest_path(
+            disrupted_graph, blockage.node, instance.depot.node, weight="travel_time"
+        )
+        remaining_time = 0.0
+        for u, v in zip(return_path[:-1], return_path[1:], strict=True):
+            remaining_time += min(
+                disrupted_graph[u][v].values(), key=lambda data: data["travel_time"]
+            )["travel_time"]
+        remaining_dist = _path_distance_m(disrupted_graph, return_path)
+        final_order = served_order
 
     return ReplanResult(
         triggered=True,
         feasible=True,
-        drive_time_s=served_time + visiting_time + return_time_s,
-        distance_m=served_dist + visiting_dist + return_dist_m,
+        drive_time_s=served_time + remaining_time,
+        distance_m=served_dist + remaining_dist,
         order=final_order,
     )
 

@@ -8,7 +8,7 @@ produced exactly one route for exactly one vehicle. After it, an instance
 with `fleet_size > 1` and a `vehicle_capacity` gets a genuine multi-vehicle
 CVRP solve (Clarke-Wright + 2-opt), and `dlm benchmark` puts that — and
 the original single-vehicle NN+2-opt — up against Google OR-Tools, the
-project's fixed benchmark oracle (ADR-0001).
+project's fixed benchmark solver (ADR-0001).
 
 ## Scope
 
@@ -167,7 +167,7 @@ dlm benchmark --instances small,fleet
 - ✅ **OR-Tools benchmark runs for both `K=1` and `K>1` and is a sane
   comparator.** `test_ortools_single_route_is_a_sane_benchmark_for_two_opt`,
   `test_ortools_fleet_respects_the_same_capacity_as_clarke_wright`.
-- ✅ **Time windows are demonstrated on the benchmark oracle.**
+- ✅ **Time windows are demonstrated on the benchmark solver.**
   `test_ortools_time_window_drops_an_unreachable_stop_not_the_whole_solve`
   — a stop with an impossible time window is dropped (reported in
   `unassigned`), the rest of the instance still solves.

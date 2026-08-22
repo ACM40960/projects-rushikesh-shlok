@@ -1,5 +1,5 @@
 """OR-Tools routing model over the same travel-time matrix, used as a
-benchmark oracle rather than the primary method (ADR-0001: NN+2-opt /
+benchmark solver rather than the primary method (ADR-0001: NN+2-opt /
 Clarke-Wright are the fixed hand-implemented solvers; OR-Tools exists to
 quantify what they give up in solution quality — `dlm benchmark`).
 
@@ -22,10 +22,12 @@ downstream stop's arrival time after each candidate move, not just total
 cost) is substantially more engineering for a hand-implemented v1 than
 this project's scope justifies. OR-Tools already solves VRPTW natively
 (one more `AddDimension` call), which is exactly the kind of capability
-gap a benchmark oracle exists to make visible rather than hide.
+gap a benchmark solver exists to make visible rather than hide.
 """
 
 from __future__ import annotations
+
+from decimal import ROUND_HALF_UP, Decimal
 
 from dlm.instance.matrix import Matrix
 from dlm.instance.schema import Instance
@@ -34,6 +36,29 @@ from dlm.solver.base import FleetSolution, Solution, build_fleet_solution
 DEFAULT_TIME_LIMIT_S = 10.0
 _DISJUNCTION_PENALTY = 1_000_000
 _DEFAULT_HORIZON_S = 6 * 3600
+_MAX_CAPACITY_DECIMAL_PLACES = 6
+
+
+def _scaled_capacity_values(instance: Instance) -> tuple[list[int], int, int]:
+    """Convert decimal demands/capacity to exact-enough OR-Tools integers.
+
+    OR-Tools' capacity dimension is integer-valued. Rounding each demand
+    independently (the previous implementation) could turn values such as
+    ``0.4`` into zero and silently remove the constraint. A shared power-of-
+    ten scale preserves up to six decimal places for every value.
+    """
+    assert instance.vehicle_capacity is not None
+    values = [
+        Decimal(str(instance.vehicle_capacity)),
+        *(Decimal(str(s.demand)) for s in instance.stops),
+    ]
+    decimal_places = max(0, *(-value.normalize().as_tuple().exponent for value in values))
+    scale = 10 ** min(decimal_places, _MAX_CAPACITY_DECIMAL_PLACES)
+
+    def scaled(value: Decimal) -> int:
+        return int((value * scale).to_integral_value(rounding=ROUND_HALF_UP))
+
+    return [0, *(scaled(Decimal(str(s.demand))) for s in instance.stops)], scaled(values[0]), scale
 
 
 class OrToolsSolutionNotFound(RuntimeError):
@@ -44,11 +69,13 @@ class OrToolsSolutionNotFound(RuntimeError):
 
 
 class OrToolsSolver:
-    """CVRP(TW) benchmark oracle: `fleet_size` vehicles, optional
+    """CVRP(TW) benchmark solver: `fleet_size` vehicles, optional
     `vehicle_capacity`, optional per-stop `time_window`.
     """
 
     def __init__(self, time_limit_s: float = DEFAULT_TIME_LIMIT_S) -> None:
+        if time_limit_s <= 0:
+            raise ValueError("time_limit_s must be greater than zero")
         self.time_limit_s = time_limit_s
 
     def solve(self, instance: Instance, matrix: Matrix) -> Solution:
@@ -101,7 +128,7 @@ class OrToolsSolver:
         routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
 
         if instance.vehicle_capacity is not None:
-            demands = [0, *(int(round(s.demand)) for s in stops)]
+            demands, scaled_capacity, capacity_scale = _scaled_capacity_values(instance)
 
             def demand_callback(from_index: int) -> int:
                 return demands[manager.IndexToNode(from_index)]
@@ -110,15 +137,37 @@ class OrToolsSolver:
             routing.AddDimensionWithVehicleCapacity(
                 demand_callback_index,
                 0,
-                [int(instance.vehicle_capacity)] * num_vehicles,
+                [scaled_capacity] * num_vehicles,
                 True,
                 "Capacity",
             )
+        else:
+            capacity_scale = None
 
         has_time_windows = apply_time_windows and any(s.time_window is not None for s in stops)
         if has_time_windows:
+            from dlm.config import settings
+
+            service_times = [
+                0,
+                *(
+                    int(round(stop.service_time_s or settings.default_service_time_s))
+                    for stop in stops
+                ),
+            ]
+
+            def schedule_callback(from_index: int, to_index: int) -> int:
+                from_node_index = manager.IndexToNode(from_index)
+                travel_s = time_callback(from_index, to_index)
+                return travel_s + service_times[from_node_index]
+
+            schedule_callback_index = routing.RegisterTransitCallback(schedule_callback)
             routing.AddDimension(
-                transit_callback_index, _DEFAULT_HORIZON_S, _DEFAULT_HORIZON_S, False, "Time"
+                schedule_callback_index,
+                _DEFAULT_HORIZON_S,
+                _DEFAULT_HORIZON_S,
+                False,
+                "Time",
             )
             time_dimension = routing.GetDimensionOrDie("Time")
             for idx, stop in enumerate(stops, start=1):
@@ -137,7 +186,7 @@ class OrToolsSolver:
         search_parameters.local_search_metaheuristic = (
             routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
         )
-        search_parameters.time_limit.FromSeconds(int(self.time_limit_s))
+        search_parameters.time_limit.FromMilliseconds(max(1, int(round(self.time_limit_s * 1000))))
 
         assignment = routing.SolveWithParameters(search_parameters)
         if assignment is None:
@@ -173,6 +222,7 @@ class OrToolsSolver:
                 "time_windows": has_time_windows,
                 "n_vehicles_used": len(routes),
                 "time_limit_s": self.time_limit_s,
+                "capacity_scale": capacity_scale,
             },
         )
 

@@ -18,8 +18,8 @@ flowchart LR
     C --> D[Travel-time matrix<br/>+ path store]
     D --> E["Baseline solve<br/>K=1: NN + 2-opt<br/>K&gt;1: Clarke-Wright + 2-opt"]
     E --> F[T1: normal cost]
-    E -.benchmark oracle.-> Z[OR-Tools]
-    G[Disruption:<br/>YAML or drawn] --> H[Disrupted graph view]
+    E -.benchmark solver.-> Z[OR-Tools]
+    G[Saved disruption YAML] --> H[Disrupted graph view]
     F --> I[Execute frozen route<br/>on disrupted graph]
     H --> I
     I --> J[T2: disrupted cost]
@@ -31,7 +31,7 @@ flowchart LR
     N --> O["Streamlit UI<br/>(thin client over all of the above)"]
 ```
 
-The OR-Tools branch (`Z`) is a benchmark oracle only (Stage 8) — it never
+The OR-Tools branch (`Z`) is a benchmark solver only (Stage 8) — it never
 feeds `T1`/`T2`/`T3`, it exists to answer "how far is the hand-implemented
 solver from OR-Tools' answer," reported via `dlm benchmark`.
 

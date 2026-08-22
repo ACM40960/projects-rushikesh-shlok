@@ -60,12 +60,12 @@ def plot_curated_scenario_comparison(df: pd.DataFrame, out_dir: Path) -> tuple[P
     as a misleading zero.
     """
     curated = df[df["scenario_kind"] == "curated"].sort_values("scenario")
-    labels = curated["scenario"].tolist()
+    labels = [value.replace("_", " ").title() for value in curated["scenario"]]
     metrics = [
         ("T1_total_s", "T1 (normal)", _COLOR_T1),
         ("T2_reactive_total_s", "T2 (reactive)", _COLOR_T2),
         ("T3_total_s", "T3 (re-optimised)", _COLOR_T3),
-        ("T3_oracle_total_s", "T3_oracle", _COLOR_T3_ORACLE),
+        ("T3_oracle_total_s", "T3 full-knowledge heuristic", _COLOR_T3_ORACLE),
     ]
     x = list(range(len(labels)))
     width = 0.2
@@ -89,7 +89,8 @@ def plot_curated_scenario_comparison(df: pd.DataFrame, out_dir: Path) -> tuple[P
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=20, ha="right")
     ax.set_ylabel("Total time (s)")
-    ax.set_title("T1 vs T2 vs T3 vs T3_oracle — curated Dublin scenarios")
+    instance_name = str(curated["instance"].iloc[0])
+    ax.set_title(f"Route costs under curated disruptions — {instance_name} instance")
     ax.legend()
     fig.tight_layout()
     return _save_both(fig, out_dir, "t1_t2_t3_comparison")
@@ -102,7 +103,7 @@ def plot_feasibility_breakdown(df: pd.DataFrame, out_dir: Path) -> tuple[Path, P
         ("T2_omniscient_feasible", "T2\n(omniscient)"),
         ("T2_reactive_feasible", "T2\n(reactive)"),
         ("T3_feasible", "T3"),
-        ("T3_oracle_feasible", "T3_oracle"),
+        ("T3_oracle_feasible", "Full-knowledge\nheuristic"),
     ]
     labels = [m[1] for m in metrics]
     total = len(df)
@@ -126,19 +127,75 @@ def plot_feasibility_breakdown(df: pd.DataFrame, out_dir: Path) -> tuple[Path, P
 
 
 def plot_saving_distribution(df: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
-    """Histogram of `Saving % = (T2 - T3) / T2 * 100` over every run where
-    both `T2` (reactive) and `T3` are feasible."""
+    """Count zero/positive/negative savings and infeasible comparisons."""
     values = df["saving_pct"].dropna()
-
+    tolerance = 1e-9
+    counts = [
+        int((values.abs() <= tolerance).sum()),
+        int((values > tolerance).sum()),
+        int((values < -tolerance).sum()),
+        int(df["saving_pct"].isna().sum()),
+    ]
+    labels = ["Zero saving", "Positive", "Negative", "Infeasible"]
     fig, ax = plt.subplots(figsize=(7, 4))
-    if len(values):
-        bins = min(15, max(3, len(values) // 2))
-        ax.hist(values, bins=bins, color=_COLOR_T3, edgecolor="white")
-    ax.set_xlabel("Saving % = (T2 - T3) / T2 * 100")
+    bars = ax.bar(
+        labels,
+        counts,
+        color=[_COLOR_T1, _COLOR_T3, _COLOR_T2, _COLOR_INFEASIBLE],
+    )
+    ax.bar_label(bars, padding=3)
     ax.set_ylabel("Runs")
-    ax.set_title(f"Saving % distribution (n={len(values)} feasible T2+T3 pairs)")
+    ax.set_title("Reactive reordering outcomes in the default batch")
+    ax.set_ylim(0, max(counts, default=0) * 1.15 + 1)
     fig.tight_layout()
     return _save_both(fig, out_dir, "saving_distribution")
+
+
+def plot_service_time_sensitivity(df: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
+    """T1 sensitivity to the assumed service time per stop."""
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    for instance_name, group in df.groupby("instance", sort=False):
+        group = group.sort_values("default_service_time_s")
+        ax.plot(
+            group["default_service_time_s"],
+            group["total_time_s"],
+            marker="o",
+            label=str(instance_name).title(),
+        )
+    ax.set_xlabel("Service time per stop (s)")
+    ax.set_ylabel("T1 total time (s)")
+    ax.set_title("Service-time sensitivity")
+    ax.legend(title="Instance")
+    fig.tight_layout()
+    return _save_both(fig, out_dir, "service_time_sensitivity")
+
+
+def plot_benchmark_gap(df: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
+    """Hand-solver percentage gap relative to the OR-Tools benchmark."""
+    data = df.dropna(subset=["gap_pct"])
+    labels = [str(value).title() for value in data["instance"]]
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    bars = ax.bar(labels, data["gap_pct"], color=_COLOR_T1)
+    ax.bar_label(bars, labels=[f"{value:.1f}%" for value in data["gap_pct"]], padding=3)
+    ax.set_ylabel("Gap to OR-Tools (%)")
+    ax.set_title("Hand-implemented solver benchmark gap")
+    ax.set_ylim(0, max(data["gap_pct"], default=0) * 1.18 + 1)
+    fig.tight_layout()
+    return _save_both(fig, out_dir, "benchmark_gap")
+
+
+def plot_stress_test_saving(df: pd.DataFrame, out_dir: Path) -> tuple[Path, Path]:
+    """Show the engineered stress test separately from the default batch."""
+    data = df.dropna(subset=["saving_pct"])
+    labels = [str(value).replace("_", " ").title() for value in data["scenario"]]
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    bars = ax.bar(labels, data["saving_pct"], color=_COLOR_T3)
+    ax.bar_label(bars, labels=[f"{value:.1f}%" for value in data["saving_pct"]], padding=3)
+    ax.set_ylabel("Reactive reordering saving (%)")
+    ax.set_title("Route-intersection stress test")
+    ax.set_ylim(0, max(data["saving_pct"], default=0) * 1.18 + 1)
+    fig.tight_layout()
+    return _save_both(fig, out_dir, "stress_test_saving")
 
 
 def make_all_figures(
@@ -155,16 +212,29 @@ def make_all_figures(
     chosen_instance = instance or df["instance"].iloc[0]
     instance_df = df[df["instance"] == chosen_instance]
 
-    return [
+    figures = [
         plot_curated_scenario_comparison(instance_df, out_dir),
         plot_feasibility_breakdown(df, out_dir),
         plot_saving_distribution(df, out_dir),
     ]
+    sensitivity_path = results_csv.with_name("sensitivity_results.csv")
+    benchmark_path = results_csv.with_name("benchmark_results.csv")
+    stress_path = results_csv.with_name("stress_test_results.csv")
+    if sensitivity_path.exists():
+        figures.append(plot_service_time_sensitivity(pd.read_csv(sensitivity_path), out_dir))
+    if benchmark_path.exists():
+        figures.append(plot_benchmark_gap(pd.read_csv(benchmark_path), out_dir))
+    if stress_path.exists():
+        figures.append(plot_stress_test_saving(pd.read_csv(stress_path), out_dir))
+    return figures
 
 
 __all__ = [
     "make_all_figures",
     "plot_curated_scenario_comparison",
     "plot_feasibility_breakdown",
+    "plot_benchmark_gap",
     "plot_saving_distribution",
+    "plot_service_time_sensitivity",
+    "plot_stress_test_saving",
 ]

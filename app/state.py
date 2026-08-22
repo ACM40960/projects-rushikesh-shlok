@@ -20,7 +20,14 @@ import networkx as nx
 
 from dlm.config import settings
 from dlm.disruption.engine import DisruptionResult, apply_scenario
-from dlm.disruption.schema import find_scenario, list_scenarios, load_scenario
+from dlm.disruption.schema import (
+    Disruption,
+    DisruptionEffect,
+    Scenario,
+    find_scenario,
+    list_scenarios,
+    load_scenario,
+)
 from dlm.instance.builder import InstanceBuilder, MutationResult
 from dlm.instance.matrix import build_matrix
 from dlm.instance.presets import load_presets
@@ -107,6 +114,34 @@ def list_preset_names() -> list[str]:
 
 def list_scenario_names() -> list[str]:
     return sorted(p.stem for p in list_scenarios())
+
+
+def scenario_has_slow_zone(scenario_name: str) -> bool:
+    """Whether a saved scenario contains at least one adjustable slow zone."""
+    scenario = load_scenario(find_scenario(scenario_name))
+    return any(d.effect is DisruptionEffect.SLOW_ZONE for d in scenario.disruptions)
+
+
+def scenario_with_speed_factor(scenario_name: str, speed_factor: float) -> Scenario:
+    """Return a copy with every slow-zone factor set to ``speed_factor``."""
+    if not 0 < speed_factor < 1:
+        raise ValueError("speed_factor must be strictly between 0 and 1")
+    original = load_scenario(find_scenario(scenario_name))
+    adjusted: list[Disruption] = []
+    for disruption in original.disruptions:
+        values = disruption.model_dump()
+        if disruption.effect is DisruptionEffect.SLOW_ZONE:
+            values["speed_factor"] = speed_factor
+        adjusted.append(Disruption(**values))
+    return Scenario(
+        schema_version=original.schema_version,
+        name=f"{original.name}_adjusted",
+        description=(
+            f"{original.description} Adjusted remaining-speed factor: {speed_factor:.2f}."
+        ),
+        source=original.source,
+        disruptions=adjusted,
+    )
 
 
 def parse_latlon(value: str) -> tuple[float, float]:
@@ -280,7 +315,11 @@ class CompareOutcome:
 
 
 def run_compare(
-    instance_name: str, scenario_name: str, solver_name: str = "nn_2opt"
+    instance_name: str,
+    scenario_name: str,
+    solver_name: str = "nn_2opt",
+    at_time: float | None = 0.0,
+    scenario_override: Scenario | None = None,
 ) -> CompareOutcome:
     """`T1`/`T2`/`T3`/`T3_oracle`/`Saving %` for an instance under a
     scenario — identical call sequence to `dlm.cli.compare`.
@@ -296,8 +335,11 @@ def run_compare(
             "comparison only supports single-vehicle instances (see docs/limitations.md)."
         )
 
-    scenario_path = find_scenario(scenario_name)
-    scenario = load_scenario(scenario_path)
+    scenario = (
+        scenario_override
+        if scenario_override is not None
+        else load_scenario(find_scenario(scenario_name))
+    )
 
     nodes = [inst.depot.node, *(s.node for s in inst.stops)]
     matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
@@ -306,7 +348,7 @@ def run_compare(
     solution = SOLVERS[solver_name]().solve(inst, matrix)
     t1 = compute_t1(inst, solution)
 
-    disruption_result = apply_scenario(graph, scenario)
+    disruption_result = apply_scenario(graph, scenario, at_time=at_time)
     t2_omniscient = compute_t2(inst, solution, disruption_result.graph, InformationModel.OMNISCIENT)
     t2_reactive = compute_t2(inst, solution, disruption_result.graph, InformationModel.REACTIVE)
     t3 = compute_t3(inst, solution, disruption_result.graph)
@@ -347,4 +389,6 @@ __all__ = [
     "remove_stop",
     "run_compare",
     "run_plan",
+    "scenario_has_slow_zone",
+    "scenario_with_speed_factor",
 ]

@@ -16,9 +16,12 @@ import pytest
 
 from dlm.viz.figures import (
     make_all_figures,
+    plot_benchmark_gap,
     plot_curated_scenario_comparison,
     plot_feasibility_breakdown,
     plot_saving_distribution,
+    plot_service_time_sensitivity,
+    plot_stress_test_saving,
 )
 
 _COLUMNS = [
@@ -164,3 +167,24 @@ def test_make_all_figures_uses_the_first_instance_by_default(tmp_path) -> None:
     # both should succeed regardless of which instance drives the comparison figure
     make_all_figures(csv_path, tmp_path / "default")
     make_all_figures(csv_path, tmp_path / "explicit", instance="medium")
+
+
+def test_sensitivity_benchmark_and_stress_figures(tmp_path) -> None:
+    sensitivity = pd.DataFrame(
+        {
+            "instance": ["small", "small", "large", "large"],
+            "default_service_time_s": [60, 180, 60, 180],
+            "total_time_s": [1000, 1500, 3000, 5000],
+        }
+    )
+    benchmark = pd.DataFrame({"instance": ["small", "large"], "gap_pct": [1.5, 15.8]})
+    stress = pd.DataFrame({"scenario": ["demo_saving_showcase"], "saving_pct": [7.425946]})
+
+    outputs = [
+        plot_service_time_sensitivity(sensitivity, tmp_path),
+        plot_benchmark_gap(benchmark, tmp_path),
+        plot_stress_test_saving(stress, tmp_path),
+    ]
+    for png_path, svg_path in outputs:
+        assert png_path.exists() and png_path.stat().st_size > 0
+        assert svg_path.exists() and svg_path.stat().st_size > 0

@@ -8,13 +8,16 @@ on:
 jobs:
   lint-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -28,4 +31,4 @@ jobs:
         run: ruff format --check .
 
       - name: Test (pytest)
-        run: pytest --cov=dlm --cov-report=term-missing
+        run: pytest --cov=dlm --cov-report=term-missing --cov-fail-under=70

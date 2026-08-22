@@ -83,12 +83,12 @@ boundary-effect nodes at the edge of the bbox, not a meaningful loss of
 real network (see Results below for the actual counts).
 
 **Caching.** Two independent caches exist for two different reasons:
-1. `data/cache/dublin_<network_type>_<hash>.graphml` — the final graph
+1. `data/cache/dublin_<network_type>_<hash>.pkl` — the final graph
    (post-SCC, post-travel-time), keyed by `(bbox, network_type, simplify,
    osmnx_version)`. This is what makes `dlm network build`/`stats` fast on
    a second call.
 2. The raw Overpass XML fetched by `curl` is written to a temp file and
-   deleted after use — it is *not* itself cached, since the graphml cache
+   deleted after use — it is *not* itself cached, since the pickle cache
    already captures everything downstream of it and there was no
    reliability benefit (the flaky part is the network fetch, not the
    parsing) to keeping the intermediate XML.
@@ -192,27 +192,24 @@ All 18 tests pass (`pytest -v`, 12 offline fixture-based + 6 real-network,
 
 ```
 $ dlm network build
-cache:            data/cache/dublin_drive_f9b11d3950321b74.graphml (built fresh)
-build time:       31.47s
-nodes:            10899 (dropped 71 outside largest strongly connected component)
-edges:            24837 (dropped 96)
-maxspeed real:    24390/24837 (98.2%)
-maxspeed imputed: 447/24837
+cache:            data/cache/dublin_drive_664cee449591eb29.pkl (hit)
+build time:       0.83s
+nodes:            28112 (pre-SCC count unavailable from cache)
+edges:            62068 (pre-SCC count unavailable from cache)
+maxspeed real:    55750/62068 (89.8%)
+maxspeed imputed: 6318/62068
 
 $ dlm network stats   # second run, cache hit
-cache:            data/cache/dublin_drive_f9b11d3950321b74.graphml (hit)
-build time:       3.69s
-nodes:            10899 (dropped 0 outside largest strongly connected component)
-edges:            24837 (dropped 0)
+cache:            data/cache/dublin_drive_664cee449591eb29.pkl (hit)
+build time:       0.83s
+nodes:            28112 (pre-SCC count unavailable from cache)
+edges:            62068 (pre-SCC count unavailable from cache)
 ```
 
-98.2% real `maxspeed` coverage is notably higher than a naive prior would
-suggest — Dublin/Ireland OSM data is unusually well-tagged for speed limits,
-plausibly reflecting a concerted community effort after Ireland's 2005
-metric speed-limit changeover. This is a genuinely good result, not a bug
-(spot-checked: the 447 imputed edges are disproportionately `service` and
-minor `residential` ways, consistent with the general pattern of sparser
-tagging on minor roads).
+89.8% of directed edges use a parsed OSM `maxspeed`; the remainder use the
+documented fallback assumptions in `speed_defaults.yaml`. The fallback values
+are modelling assumptions, not claims about statutory limits on each OSM road
+class.
 
 ## Known limitations
 
