@@ -74,12 +74,14 @@ route_map.html}`.
 ## `dlm compare`
 
 ```bash
-dlm compare --instance X --scenario Y [--solver nn_2opt|nearest_neighbour]
+dlm compare --instance X --scenario Y [--solver nn_2opt|nearest_neighbour] \
+            [--at-time SECONDS]
 ```
 
 Computes `T1`/`T2` (both information models)/`T3`/`T3_oracle`/`Saving %`
 for one instance under one disruption scenario (see `dlm disrupt list`
-for available scenario names). Writes
+for available scenario names). `--at-time` applies only disruptions whose
+time windows contain that number of seconds from scenario start. Writes
 `results/<instance>-vs-<scenario>-<timestamp>/` with `config.yaml`,
 `result.json`, `route_map.html` (the `T1` plan), and
 `disruption_map.html` (what the scenario changed).
@@ -119,15 +121,24 @@ summary.json}`, and a copy to `--out` (default
 `docs/report/batch_results.csv`, the file `dlm figures` and the report
 read from). This is what `make experiment` runs.
 
+## `dlm stress-test`
+
+```bash
+dlm stress-test [--instance demo_saving] [--scenario demo_saving_showcase] [--out PATH]
+```
+
+Runs the engineered route-intersection case separately from the unbiased
+default batch. The default output is `docs/report/stress_test_results.csv`.
+
 ## `dlm figures`
 
 ```bash
 dlm figures [--results PATH] [--instance NAME] [--out DIR]
 ```
 
-Turns a `dlm batch` results CSV into report-ready PNG+SVG figures. Pure
-post-processing (no graph/instance/solver access), so it's fast and safe
-to re-run any time the CSV or figure styling changes. Defaults:
+Turns the committed batch, sensitivity, benchmark and stress-test CSVs into
+report-ready PNG+SVG figures. Pure post-processing (no graph/instance/solver
+access), so it is fast and safe to rerun after data or styling changes. Defaults:
 `--results docs/report/batch_results.csv`, `--out docs/report/figures/`.
 This is what `make figures` runs.
 
@@ -153,9 +164,9 @@ dlm benchmark [--instances small,medium,large,fleet] [--time-limit 10.0] [--out 
 
 Compares the hand-implemented solver (`nn_2opt` for `fleet_size == 1`,
 `clarke_wright_2opt` for `fleet_size > 1`) against the OR-Tools benchmark
-oracle: solution quality (`gap_pct`, positive means the hand-implemented
-solver costs more) and runtime, per instance. Default `--out
-docs/report/benchmark_results.csv`.
+solver: solution quality (`gap_pct`, positive means the hand-implemented
+solver costs more) and runtime, per instance. The default output is
+`docs/report/benchmark_results.csv`.
 
 ## Everything together: `make reproduce`
 
@@ -163,7 +174,8 @@ docs/report/benchmark_results.csv`.
 make reproduce
 ```
 
-Runs `network build` → `batch` → `figures` → `sensitivity` → `benchmark`
+Runs `network build` → `batch` → `sensitivity` → `benchmark` → `stress-test`
+→ `figures`
 in sequence, from a cold cache if necessary, regenerating every number
 and figure the written-up report depends on. See
 `docs/stages/stage-09-hardening.md` for measured timing.

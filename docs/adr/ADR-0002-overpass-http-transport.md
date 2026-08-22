@@ -55,7 +55,7 @@ OSMnx/NetworkX behaviour:
 - The fetched XML is written to a temp file, parsed via
   `ox.graph_from_xml(bidirectional=False, simplify=...)`, and the temp file
   is deleted afterward — it is not itself cached, since the final
-  `.graphml` cache (keyed by bbox/network_type/simplify/OSMnx version)
+  `.pkl` cache (keyed by bbox/network_type/simplify/OSMnx version)
   already makes repeat builds fast.
 
 ## Consequences

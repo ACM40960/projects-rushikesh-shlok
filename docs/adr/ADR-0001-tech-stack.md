@@ -20,7 +20,7 @@ picked by a tool.
 | Graph / map data | OSMnx + OpenStreetMap, NetworkX for path finding |
 | Map / UI | Streamlit + Folium/Leaflet (`streamlit-folium`, `folium.plugins.Draw`), built last (Stage 10) |
 | Solver, v1 | Single-vehicle TSP: hand-implemented Nearest Neighbour + 2-opt |
-| Solver, later | Multi-vehicle / capacity / time windows, OR-Tools as a benchmark oracle (Stage 8) |
+| Solver, later | Multi-vehicle / capacity / time windows, OR-Tools as a benchmark solver (Stage 8) |
 | Live traffic APIs | Not used — disruptions are simulated on the graph, deliberately, for reproducibility |
 | Plotting | Matplotlib for report figures, Folium for interactive maps |
 | Testing | pytest |

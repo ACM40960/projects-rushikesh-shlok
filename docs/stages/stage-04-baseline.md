@@ -210,8 +210,9 @@ identical `T1 = 3278.1s` (see the acceptance criteria section).
 
 ## Known limitations
 
-- `default_service_time_s` is a placeholder pending author confirmation —
-  ADR-0004.
+- `default_service_time_s = 180` is an explicit modelling assumption, not
+  an estimate from observed delivery operations; ADR-0004 and Stage 7's
+  sensitivity analysis quantify its effect.
 - 2-opt is first-improvement, not best-improvement; may take marginally
   more iterations to converge than a best-improvement variant, though not
   measurably at this project's scale (all three canonical instances solve

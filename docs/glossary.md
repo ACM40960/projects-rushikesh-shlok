@@ -32,6 +32,7 @@ Terms are added as the stage that introduces them lands.
   route can be infeasible under *either* information model, so it isn't a
   third kind of driver knowledge, just a possible outcome of the other
   two. See `docs/modelling.md` and `docs/stages/stage-06-experiment.md`.
-- **T1 / T2 / T3 / T3_oracle / Saving %** — the core evaluation metrics; see
-  the root `README.md` for the one-line definitions and `docs/modelling.md`
-  for the precise ones.
+- **T1 / T2 / T3 / Saving %** — the core evaluation metrics; see the root
+  `README.md` for the one-line definitions and `docs/modelling.md` for the
+  precise ones. The internal compatibility key `T3_oracle` means a
+  full-disruption-knowledge heuristic, not a proven optimum.

@@ -106,8 +106,8 @@ would only add friction to every path in every later stage's commands.
 ## How to run
 
 ```bash
-git clone <repo-url>
-cd Maths-Modelling
+git clone https://github.com/ACM40960/projects-rushikesh-shlok.git
+cd projects-rushikesh-shlok
 make setup      # creates .venv, installs dlm + [dev,ui,fleet] extras, installs pre-commit hook
 make test       # runs the pytest suite
 make lint       # ruff check + ruff format --check
@@ -166,7 +166,7 @@ dlm --version   # -> "dlm 0.1.0"
 ## Next
 
 Stage 1 depends on:
-- `dlm.config.settings` for `cache_dir` (where the graphml cache lives) and
+- `dlm.config.settings` for `cache_dir` (where the pickle graph cache lives) and
   `seed`.
 - `dlm.logging_conf.configure_logging` for consistent log output from the
   `dlm network build` command it introduces.
