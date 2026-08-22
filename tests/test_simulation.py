@@ -18,7 +18,7 @@ from __future__ import annotations
 import networkx as nx
 import pytest
 
-from dlm.instance.matrix import DEFAULT_WEIGHT, _build
+from dlm.instance.matrix import DEFAULT_WEIGHT, Matrix, _build
 from dlm.instance.schema import Depot, Instance, Stop, StopSource
 from dlm.simulation.execution import InformationModel, execute_solution
 from dlm.simulation.metrics import (
@@ -29,7 +29,7 @@ from dlm.simulation.metrics import (
     compute_t3_oracle,
 )
 from dlm.simulation.replan import replan_from_blockage
-from dlm.solver.two_opt import TwoOptSolver
+from dlm.solver.two_opt import TwoOptSolver, route_path_time_s, two_opt_path_improve
 
 # ---------------------------------------------------------------------------
 # Offline: a small "diamond" graph with a genuine alternate route
@@ -188,8 +188,51 @@ def test_closing_the_only_detour_makes_reactive_and_replan_infeasible_but_not_om
     assert t2_omni.drive_time_s == pytest.approx(34.0 + 20.0)
     assert t2_reactive.feasible is False
     assert t2_reactive.total_time_s is None
+    assert t2_reactive.drive_time_s is None
+    assert t2_reactive.distance_m is None
+    assert t2_reactive.n_stops_served == 0
+    assert t2_reactive.service_time_s == 0
+    execution = execute_solution(disrupted, solution, InformationModel.REACTIVE)
+    assert len(execution.legs) < len(solution.legs)
+    assert execution.legs[-1].feasible is False
     assert t3.feasible is False
     assert compute_saving(t2_reactive, t3) is None
+
+
+def test_path_two_opt_optimises_return_to_the_real_endpoint() -> None:
+    depot = Depot(
+        id="depot",
+        label="depot",
+        lat=53.30,
+        lon=-6.30,
+        node=0,
+        source=StopSource.LATLON,
+    )
+    stops = [
+        Stop(id="A", label="A", lat=53.31, lon=-6.29, node=1, source=StopSource.LATLON),
+        Stop(id="B", label="B", lat=53.32, lon=-6.28, node=2, source=StopSource.LATLON),
+    ]
+    instance = Instance(name="path-objective", depot=depot, stops=stops)
+    matrix = Matrix(nodes=[0, 1, 2, 9])
+    for u in matrix.nodes:
+        for v in matrix.nodes:
+            matrix.cost[(u, v)] = 0.0 if u == v else 50.0
+    matrix.cost.update(
+        {
+            (0, 1): 1.0,
+            (0, 2): 2.0,
+            (1, 2): 1.0,
+            (2, 1): 1.0,
+            (1, 9): 100.0,
+            (2, 9): 1.0,
+        }
+    )
+
+    improved, trajectory = two_opt_path_improve(0, 9, instance, matrix, ["B", "A"])
+
+    assert improved == ["A", "B"]
+    assert trajectory[-1] == pytest.approx(3.0)
+    assert route_path_time_s(0, 9, instance, matrix, improved) == pytest.approx(3.0)
 
 
 def test_replan_is_a_no_op_when_reactive_never_hits_a_closure(

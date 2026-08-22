@@ -9,11 +9,12 @@ live geocoding) — see tests/test_network.py for the same split rationale.
 from __future__ import annotations
 
 import pytest
+from pydantic import ValidationError
 
 from dlm.instance.builder import InstanceBuilder
 from dlm.instance.geocode import AmbiguousGeocodeError, GeocodeError, geocode
 from dlm.instance.presets import PresetNotFoundError, get_preset, load_presets
-from dlm.instance.schema import InstanceValidationError, Stop, StopSource
+from dlm.instance.schema import Instance, InstanceValidationError, Stop, StopSource
 from dlm.network.loader import build_graph
 from dlm.network.snapping import SnapError
 from tests.fixtures.tiny_graph import make_tiny_graph
@@ -21,6 +22,35 @@ from tests.fixtures.tiny_graph import make_tiny_graph
 # ---------------------------------------------------------------------------
 # Offline tests: presets file, and validation logic against the tiny fixture
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("updates", "message"),
+    [
+        ({"demand": -0.1}, "demand"),
+        ({"service_time_s": -1.0}, "service_time_s"),
+        ({"time_window": (-1.0, 10.0)}, "time-window bounds"),
+        ({"time_window": (10.0, 9.0)}, "time-window end"),
+    ],
+)
+def test_stop_rejects_negative_or_reversed_operational_inputs(updates, message) -> None:
+    values = {
+        "id": "s1",
+        "label": "stop",
+        "lat": 53.34,
+        "lon": -6.27,
+        "node": 1,
+        "source": StopSource.LATLON,
+        **updates,
+    }
+    with pytest.raises(ValidationError, match=message):
+        Stop(**values)
+
+
+@pytest.mark.parametrize("capacity", [0.0, -1.0])
+def test_instance_rejects_non_positive_vehicle_capacity(capacity: float) -> None:
+    with pytest.raises(ValidationError, match="vehicle_capacity"):
+        Instance(name="invalid-capacity", vehicle_capacity=capacity)
 
 
 def test_presets_file_has_at_least_30_entries_with_categories() -> None:

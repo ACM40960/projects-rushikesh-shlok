@@ -15,14 +15,16 @@ Split into two groups:
 
 from __future__ import annotations
 
+import hashlib
 import math
 import time
+from pathlib import Path
 
 import networkx as nx
 import osmnx as ox
 import pytest
 
-from dlm.network.loader import DEFAULT_BBOX, build_graph
+from dlm.network.loader import DEFAULT_BBOX, _verify_cache_checksum, build_graph
 from dlm.network.snapping import SnapError, snap_to_node
 from dlm.network.travel_time import add_travel_times, load_speed_defaults
 from tests.fixtures.tiny_graph import EXPECTED_REAL_SPEED_KPH, MAX_SNAP_DIST_M, make_tiny_graph
@@ -103,6 +105,18 @@ def test_snap_to_node_far_away_raises_snap_error() -> None:
     assert err.max_dist_m == MAX_SNAP_DIST_M
     assert err.nearest_dist_m > MAX_SNAP_DIST_M
     assert "No routable road within" in str(err)
+
+
+def test_graph_pickle_checksum_is_verified_before_loading(tmp_path: Path) -> None:
+    cache = tmp_path / "graph.pkl"
+    cache.write_bytes(b"trusted graph bytes")
+    digest = hashlib.sha256(cache.read_bytes()).hexdigest()
+    cache.with_suffix(".pkl.sha256").write_text(f"{digest}  graph.pkl\n", encoding="utf-8")
+    _verify_cache_checksum(cache)
+
+    cache.write_bytes(b"tampered graph bytes")
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        _verify_cache_checksum(cache)
 
 
 # ---------------------------------------------------------------------------

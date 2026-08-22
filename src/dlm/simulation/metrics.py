@@ -40,8 +40,8 @@ class LegMetric:
 
     from_id: str
     to_id: str
-    travel_time_s: float
-    distance_m: float
+    travel_time_s: float | None
+    distance_m: float | None
 
 
 @dataclass(frozen=True)
@@ -225,7 +225,13 @@ def compute_t2(
         See `dlm.simulation.execution` for what each model means.
     """
     execution = execute_solution(disrupted_graph, solution, information_model)
-    service_time_s = _total_service_time_s(instance, solution.order, default_service_time_s)
+    stop_ids = {stop.id for stop in instance.stops}
+    completed_stops = [
+        outcome.to_id
+        for outcome in execution.legs
+        if outcome.feasible and outcome.to_id in stop_ids
+    ]
+    service_time_s = _total_service_time_s(instance, completed_stops, default_service_time_s)
 
     drive_time_s = execution.drive_time_s
     total_time_s = drive_time_s + service_time_s if execution.feasible else None
@@ -237,7 +243,7 @@ def compute_t2(
         service_time_s=service_time_s,
         total_time_s=total_time_s,
         distance_m=execution.distance_m,
-        n_stops_served=len(solution.order),
+        n_stops_served=len(completed_stops),
         legs=[LegMetric(o.from_id, o.to_id, o.travel_time_s, o.distance_m) for o in execution.legs],
     )
 

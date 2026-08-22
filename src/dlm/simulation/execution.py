@@ -181,6 +181,11 @@ def execute_solution(
             if blockage is not None and first_blockage is None:
                 first_blockage = blockage
         legs.append(outcome)
+        # Once a required leg is impossible, the vehicle cannot teleport to
+        # its destination and continue evaluating later legs. Keep the failed
+        # leg as evidence, then stop at the real execution frontier.
+        if not outcome.feasible:
+            break
 
     feasible = all(o.feasible for o in legs)
     drive_time_s = sum(o.travel_time_s for o in legs) if feasible else None

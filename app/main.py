@@ -63,7 +63,10 @@ with st.sidebar.expander("Create a new instance"):
     vehicle_capacity = None
     if fleet_size > 1:
         vehicle_capacity = st.number_input(
-            "Vehicle capacity (per vehicle)", min_value=0.0, value=10.0, key="new_vehicle_capacity"
+            "Vehicle capacity (per vehicle)",
+            min_value=0.1,
+            value=10.0,
+            key="new_vehicle_capacity",
         )
     if st.button("Create instance", key="create_instance_btn"):
         if not new_name or not depot_value:
@@ -237,12 +240,42 @@ if instance.fleet_size > 1:
     )
 else:
     scenario_name = st.selectbox("Scenario", state.list_scenario_names(), key="scenario_name")
+    at_time = st.number_input(
+        "Scenario time (seconds from start)",
+        min_value=0.0,
+        value=0.0,
+        step=300.0,
+        help="Only disruptions active at this time are applied.",
+    )
+    scenario_mode = st.radio(
+        "Disruption mode",
+        ["Saved scenario", "Adjust selected scenario"],
+        horizontal=True,
+    )
+    scenario_override = None
+    if scenario_mode == "Adjust selected scenario":
+        if state.scenario_has_slow_zone(scenario_name):
+            speed_factor = st.slider(
+                "Remaining traffic speed",
+                min_value=0.1,
+                max_value=0.9,
+                value=0.5,
+                step=0.1,
+                help="0.5 means vehicles travel at half the original speed.",
+            )
+            scenario_override = state.scenario_with_speed_factor(scenario_name, speed_factor)
+        else:
+            st.caption("This scenario has no slow zone, so its intensity is not adjustable.")
     if st.button(
         "Compare", key="run_compare_btn", disabled=instance.depot is None or not instance.stops
     ):
         try:
             compare_outcome = state.run_compare(
-                instance_name, scenario_name, solver_name=solver_name
+                instance_name,
+                scenario_name,
+                solver_name=solver_name,
+                at_time=float(at_time),
+                scenario_override=scenario_override,
             )
             st.session_state["compare_outcome"] = compare_outcome
         except Exception as exc:  # noqa: BLE001 - report any pipeline error, not a crash
@@ -267,7 +300,7 @@ else:
             f"{co.t2_omniscient.total_time_s:.1f}s" if co.t2_omniscient.feasible else "INFEASIBLE",
         )
         c5.metric(
-            "T3_oracle (best possible)",
+            "T3 full-knowledge heuristic",
             f"{co.t3_oracle.total_time_s:.1f}s" if co.t3_oracle.feasible else "INFEASIBLE",
         )
         c6.metric("Saving %", f"{co.saving_pct:.1f}%" if co.saving_pct is not None else "n/a")

@@ -31,6 +31,64 @@ logger = logging.getLogger(__name__)
 DEFAULT_MAX_ITERATIONS = 2000
 
 
+def route_path_time_s(
+    start_node: int,
+    end_node: int,
+    instance: Instance,
+    matrix: Matrix,
+    order: list[str],
+) -> float:
+    """Cost of an open path ``start -> order -> end``.
+
+    Unlike :func:`route_time_s`, the endpoints may differ. This is the
+    correct objective for reactive replanning from a blockage to the real
+    depot.
+    """
+    stop_nodes = {stop.id: stop.node for stop in instance.stops}
+    full_nodes = [start_node, *(stop_nodes[stop_id] for stop_id in order), end_node]
+    total = 0.0
+    for u, v in zip(full_nodes[:-1], full_nodes[1:], strict=True):
+        total += matrix.get_cost(u, v)
+    return total
+
+
+def two_opt_path_improve(
+    start_node: int,
+    end_node: int,
+    instance: Instance,
+    matrix: Matrix,
+    order: list[str],
+    max_iterations: int = DEFAULT_MAX_ITERATIONS,
+) -> tuple[list[str], list[float]]:
+    """Directed-cost 2-opt for a path with fixed, distinct endpoints."""
+    current = list(order)
+    best_cost = route_path_time_s(start_node, end_node, instance, matrix, current)
+    trajectory = [best_cost]
+    iterations = 0
+    improved = True
+    while improved and iterations < max_iterations:
+        improved = False
+        n = len(current)
+        for i in range(n - 1):
+            for j in range(i + 1, n):
+                if iterations >= max_iterations:
+                    break
+                iterations += 1
+                candidate = current[:i] + list(reversed(current[i : j + 1])) + current[j + 1 :]
+                candidate_cost = route_path_time_s(
+                    start_node, end_node, instance, matrix, candidate
+                )
+                if candidate_cost < best_cost:
+                    current = candidate
+                    best_cost = candidate_cost
+                    trajectory.append(best_cost)
+                    improved = True
+                    break
+            if improved or iterations >= max_iterations:
+                break
+    return current, trajectory
+
+
 def two_opt_improve(
     instance: Instance,
     matrix: Matrix,
@@ -120,8 +178,17 @@ class TwoOptSolver:
             meta={
                 "solver": "nearest_neighbour_two_opt",
                 "two_opt_iterations": len(trajectory) - 1,
+                "two_opt_accepted_moves": len(trajectory) - 1,
                 "two_opt_trajectory": trajectory,
                 "initial_cost_s": trajectory[0],
                 "final_cost_s": trajectory[-1],
             },
         )
+
+
+__all__ = [
+    "TwoOptSolver",
+    "route_path_time_s",
+    "two_opt_improve",
+    "two_opt_path_improve",
+]

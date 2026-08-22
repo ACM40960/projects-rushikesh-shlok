@@ -68,14 +68,22 @@ def main(
 
 def _report_lines(report) -> list[str]:  # noqa: ANN001 - GraphBuildReport, avoid import at module load
     stats = report.travel_time_stats
-    dropped_nodes = report.n_nodes_before_scc - report.n_nodes
-    dropped_edges = report.n_edges_before_scc - report.n_edges
+    if report.n_nodes_before_scc is None or report.n_edges_before_scc is None:
+        node_line = f"nodes:            {report.n_nodes} (pre-SCC count unavailable from cache)"
+        edge_line = f"edges:            {report.n_edges} (pre-SCC count unavailable from cache)"
+    else:
+        dropped_nodes = report.n_nodes_before_scc - report.n_nodes
+        dropped_edges = report.n_edges_before_scc - report.n_edges
+        node_line = (
+            f"nodes:            {report.n_nodes} (dropped {dropped_nodes} outside largest "
+            "strongly connected component)"
+        )
+        edge_line = f"edges:            {report.n_edges} (dropped {dropped_edges})"
     return [
         f"cache:            {report.cache_path} ({'hit' if report.from_cache else 'built fresh'})",
         f"build time:       {report.build_seconds:.2f}s",
-        f"nodes:            {report.n_nodes} (dropped {dropped_nodes} outside largest strongly "
-        "connected component)",
-        f"edges:            {report.n_edges} (dropped {dropped_edges})",
+        node_line,
+        edge_line,
         f"maxspeed real:    {stats.n_real_maxspeed}/{stats.n_edges} ({stats.pct_real:.1f}%)",
         f"maxspeed imputed: {stats.n_imputed}/{stats.n_edges}",
     ]
@@ -160,7 +168,10 @@ def instance_new(
     seed: int = typer.Option(42, "--seed"),
     fleet_size: int = typer.Option(1, "--fleet-size", min=1, help="Number of vehicles, K."),
     vehicle_capacity: float | None = typer.Option(
-        None, "--vehicle-capacity", help="Per-vehicle demand capacity (unset = unlimited)."
+        None,
+        "--vehicle-capacity",
+        min=0.000001,
+        help="Per-vehicle demand capacity (unset = unlimited).",
     ),
     force: bool = typer.Option(
         False, "--force", help="Overwrite an existing instance of this name."
@@ -218,7 +229,9 @@ def instance_add(
     latlon: str | None = typer.Option(None, "--latlon", help="'lat,lon'"),
     preset: str | None = typer.Option(None, "--preset"),
     label: str | None = typer.Option(None, "--label"),
-    demand: float = typer.Option(0.0, "--demand", help="Delivery demand at this stop (CVRP)."),
+    demand: float = typer.Option(
+        0.0, "--demand", min=0.0, help="Delivery demand at this stop (CVRP)."
+    ),
 ) -> None:
     """Add one stop by address, lat/lon, or preset. Exactly one is required."""
     from dlm.instance.geocode import GeocodeError
@@ -600,6 +613,12 @@ def compare(
     instance: str = typer.Option(..., "--instance", help="Instance name."),
     scenario: str = typer.Option(..., "--scenario", help="Scenario name (see `dlm disrupt list`)."),
     solver: str = typer.Option("nn_2opt", "--solver", help="'nn_2opt' or 'nearest_neighbour'."),
+    at_time: float = typer.Option(
+        0.0,
+        "--at-time",
+        min=0.0,
+        help="Seconds from scenario start used to evaluate disruption time windows.",
+    ),
 ) -> None:
     """Compute T1/T2/T3/Saving % for an instance under a disruption
     scenario.
@@ -659,7 +678,7 @@ def compare(
     solution = solvers[solver].solve(inst, matrix)
     t1 = compute_t1(inst, solution)
 
-    disruption_result = apply_scenario(graph, sc)
+    disruption_result = apply_scenario(graph, sc, at_time=at_time)
     t2_omniscient = compute_t2(inst, solution, disruption_result.graph, InformationModel.OMNISCIENT)
     t2_reactive = compute_t2(inst, solution, disruption_result.graph, InformationModel.REACTIVE)
     t3 = compute_t3(inst, solution, disruption_result.graph)
@@ -676,6 +695,7 @@ def compare(
         "solver": solver,
         "seed": inst.seed,
         "default_service_time_s": settings.default_service_time_s,
+        "at_time": at_time,
         "graph_cache_key": graph_report.cache_path.stem,
     }
     (run_dir / "config.yaml").write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
@@ -738,9 +758,9 @@ def compare(
             f"replan {'triggered' if t3.triggered else 'not needed'})"
         )
     if not t3_oracle.feasible:
-        typer.echo("T3_oracle (best possible): INFEASIBLE")
+        typer.echo("T3 full-knowledge heuristic: INFEASIBLE")
     else:
-        typer.echo(f"T3_oracle (best possible): {t3_oracle.total_time_s:.1f}s")
+        typer.echo(f"T3 full-knowledge heuristic: {t3_oracle.total_time_s:.1f}s")
     if saving_pct is not None:
         typer.echo(f"Saving %:          {saving_pct:.1f}%  (vs T2 reactive)")
     elif t2_reactive.feasible and not t3.feasible:
@@ -944,7 +964,10 @@ def batch(
         "small,medium,large", "--instances", help="Comma-separated instance names."
     ),
     n_random: int = typer.Option(
-        10, "--n-random", help="Seeded random scenarios to add on top of the curated library."
+        10,
+        "--n-random",
+        min=0,
+        help="Seeded random scenarios to add on top of the curated library.",
     ),
     seed: int = typer.Option(42, "--seed", help="Base seed for random scenario generation."),
     out: str | None = typer.Option(
@@ -1088,6 +1111,76 @@ def batch(
     typer.echo(f"also written to:   {out_path}")
 
 
+@app.command("stress-test")
+def stress_test(
+    instance: str = typer.Option("demo_saving", "--instance"),
+    scenario: str = typer.Option("demo_saving_showcase", "--scenario"),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Also write the result CSV here (default docs/report/stress_test_results.csv).",
+    ),
+) -> None:
+    """Run the reproducible route-intersection stress test separately.
+
+    This command deliberately does not add the engineered case to the
+    unbiased default batch.
+    """
+    from datetime import UTC, datetime
+
+    import pandas as pd
+
+    from dlm.config import REPO_ROOT, settings
+    from dlm.disruption.engine import apply_scenario
+    from dlm.disruption.schema import find_scenario, load_scenario
+    from dlm.instance.builder import InstanceBuilder
+    from dlm.instance.matrix import build_matrix
+    from dlm.network.loader import build_graph
+    from dlm.simulation.execution import InformationModel
+    from dlm.simulation.metrics import compute_saving, compute_t1, compute_t2, compute_t3
+    from dlm.solver.two_opt import TwoOptSolver
+
+    graph, graph_report = build_graph()
+    inst = InstanceBuilder.load(graph, _instance_path(instance)).build()
+    nodes = [inst.depot.node, *(stop.node for stop in inst.stops)]
+    matrix, _ = build_matrix(graph, nodes, graph_id=graph_report.cache_path.stem)
+    solution = TwoOptSolver().solve(inst, matrix)
+    disruption_result = apply_scenario(graph, load_scenario(find_scenario(scenario)), at_time=0.0)
+    t1 = compute_t1(inst, solution)
+    t2 = compute_t2(inst, solution, disruption_result.graph, InformationModel.REACTIVE)
+    t3 = compute_t3(inst, solution, disruption_result.graph)
+    saving_pct = compute_saving(t2, t3)
+    df = pd.DataFrame(
+        [
+            {
+                "instance": instance,
+                "scenario": scenario,
+                "T1_total_s": t1.total_time_s,
+                "T2_reactive_feasible": t2.feasible,
+                "T2_reactive_total_s": t2.total_time_s,
+                "T3_feasible": t3.feasible,
+                "T3_triggered": t3.triggered,
+                "T3_total_s": t3.total_time_s,
+                "saving_pct": saving_pct,
+            }
+        ]
+    )
+
+    run_dir = settings.results_dir / f"stress-test-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    df.to_csv(run_dir / "stress_test_results.csv", index=False)
+    out_path = Path(out) if out else REPO_ROOT / "docs" / "report" / "stress_test_results.csv"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(out_path, index=False)
+
+    saving_text = "n/a" if saving_pct is None else f"{saving_pct:.1f}%"
+    typer.echo(f"instance/scenario: {instance} / {scenario}")
+    typer.echo(f"T3 triggered:      {t3.triggered}")
+    typer.echo(f"Saving %:          {saving_text}")
+    typer.echo(f"written to:        {run_dir}")
+    typer.echo(f"also written to:   {out_path}")
+
+
 @app.command("figures")
 def figures(
     results_csv: str | None = typer.Option(
@@ -1171,6 +1264,9 @@ def sensitivity(
     except ValueError as exc:
         typer.echo(f"--values must be comma-separated numbers, got {values!r}")
         raise typer.Exit(code=1) from exc
+    if not service_time_values or any(value < 0 for value in service_time_values):
+        typer.echo("--values must contain one or more non-negative service times")
+        raise typer.Exit(code=1)
     solvers = {"nn_2opt": TwoOptSolver(), "nearest_neighbour": NearestNeighbourSolver()}
     if solver not in solvers:
         typer.echo(f"Unknown solver {solver!r}. Choices: {', '.join(solvers)}")
@@ -1250,7 +1346,9 @@ def benchmark(
     instances: str = typer.Option(
         "small,medium,large,fleet", "--instances", help="Comma-separated instance names."
     ),
-    time_limit_s: float = typer.Option(10.0, "--time-limit", help="OR-Tools search time budget."),
+    time_limit_s: float = typer.Option(
+        10.0, "--time-limit", min=0.001, help="OR-Tools search time budget."
+    ),
     out: str | None = typer.Option(
         None,
         "--out",
@@ -1259,7 +1357,7 @@ def benchmark(
 ) -> None:
     """Compare the hand-implemented solver (`nn_2opt` for `fleet_size ==
     1`, `clarke_wright_2opt` for `fleet_size > 1`) against the OR-Tools
-    benchmark oracle: solution quality (`gap_pct`, positive = hand-
+    benchmark solver: solution quality (`gap_pct`, positive = hand-
     implemented costs more) and runtime, per instance.
 
     Writes `results/benchmark-<timestamp>/` and a committed CSV
