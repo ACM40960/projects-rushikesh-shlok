@@ -1,5 +1,7 @@
 # Disruption-Aware Last-Mile Delivery Routing in Dublin
 
+[![CI](https://github.com/ACM40960/projects-rushikesh-shlok/actions/workflows/ci.yml/badge.svg)](https://github.com/ACM40960/projects-rushikesh-shlok/actions/workflows/ci.yml)
+
 Shlok Shetty and Rushikesh Mane
 ACM40960 — Projects in Mathematics Modelling, University College Dublin
 
